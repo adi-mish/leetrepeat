@@ -20,8 +20,25 @@ if(MSVC)
 else()
     target_compile_options(leetrepeat_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+add_library(leetrepeat_ui
+    src/models/ProblemListModel.cpp
+    src/controllers/ReviewController.cpp
+    src/controllers/AppController.cpp
+)
+target_link_libraries(leetrepeat_ui PUBLIC leetrepeat_core Qt6::Quick Qt6::QuickControls2)
 qt_add_executable(leetrepeat src/main.cpp)
-target_link_libraries(leetrepeat PRIVATE leetrepeat_core Qt6::Quick Qt6::QuickControls2)
+target_link_libraries(leetrepeat PRIVATE leetrepeat_ui)
+set(APP_QML_FILES
+    qml/Main.qml
+    qml/components/StatCard.qml
+    qml/pages/TodayPage.qml
+    qml/pages/ReviewPage.qml
+    qml/pages/ProblemLibraryPage.qml
+    qml/pages/ProblemDetailPage.qml
+    qml/pages/SettingsPage.qml
+    qml/pages/ImportPage.qml
+)
+qt_add_resources(leetrepeat app_qml PREFIX "/" FILES ${APP_QML_FILES})
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
     foreach(test scheduler database daily_queue csv)
@@ -29,5 +46,10 @@ if(BUILD_TESTING)
         target_link_libraries(test_${test} PRIVATE leetrepeat_core Qt6::Test)
         add_test(NAME ${test} COMMAND test_${test})
     endforeach()
+    qt_add_executable(test_workflow tests/test_workflow.cpp)
+    target_link_libraries(test_workflow PRIVATE leetrepeat_ui Qt6::Test)
+    target_compile_definitions(test_workflow PRIVATE QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME workflow COMMAND test_workflow)
+    set_tests_properties(workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
 endif()
 install(TARGETS leetrepeat BUNDLE DESTINATION . RUNTIME DESTINATION bin)
