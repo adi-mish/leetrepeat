@@ -7,6 +7,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTimer>
 #include <cstdio>
@@ -23,6 +24,11 @@ static int startupFailure(QGuiApplication &app, const QString &message, bool smo
 
 int main(int argc,char **argv) {
     QGuiApplication app(argc,argv);
+    // This desktop UI does not scale or rotate text. Use native font rasterization
+    // on Wayland instead of Qt Quick's distance-field glyph shader.
+    // Set the default before any QML text items (including startup errors) exist.
+    if (QGuiApplication::platformName().startsWith("wayland"))
+        QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
     QCoreApplication::setOrganizationName("LeetRepeat");
     QCoreApplication::setApplicationName("LeetRepeat");
     QCoreApplication::setApplicationVersion("1.0.0");

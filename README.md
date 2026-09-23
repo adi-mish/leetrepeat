@@ -27,6 +27,8 @@ Requires Qt **6.2+**, CMake **3.21+**, and a C++20 compiler. Qt Quick Controls u
 
 If a QML module or plugin is reported missing, install the complete runtime list above. In particular, `qt6-declarative-dev` alone does not install the QML Controls, Templates, Dialogs, and WorkerScript plugins. Qt SQL also requires the separate SQLite driver package.
 
+Wayland remains supported and uses Qt's native font rasterizer for desktop text, configured before any QML views are created. Other platforms retain their default text renderer. LeetRepeat does not force an X11 fallback or change system-wide display settings. See [Qt's text rendering modes](https://doc.qt.io/qt-6/qquickwindow.html#setTextRenderType).
+
 ## Daily use
 
 1. Open **Problems**, then **Import CSV** or **Add problem**.
