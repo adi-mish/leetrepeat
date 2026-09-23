@@ -1,0 +1,48 @@
+{
+  "retrieved_at_utc": "2026-09-23T00:53:56.938020+00:00",
+  "list_source": "https://neetcode.io/practice/practice/neetcode250",
+  "list_data_source": "https://neetcode.io/main.f39af0c52a4e9fb5.js",
+  "availability_source": "https://leetcode.com/api/problems/all/",
+  "list_data_sha256": "426da304cbc42c91a25986ed680c06fd632fc25da741ac2881fd928ac9a051a8",
+  "availability_data_sha256": "2063cc3f45534ee6e0fce94cfd3ae0dc04e31bb0c559f8f5e27119ed5db4f107",
+  "csv_sha256": "ab13acaf24406400b6182a2394addf30ecae3801925fc0c4333d6c43807215ad",
+  "total_list_count": 250,
+  "free_count": 243,
+  "premium_excluded_count": 7,
+  "unmatched_count": 0,
+  "difficulty_counts": {
+    "Easy": 59,
+    "Medium": 150,
+    "Hard": 34
+  },
+  "premium_excluded": [
+    {
+      "title": "Encode and Decode Strings",
+      "url": "https://leetcode.com/problems/encode-and-decode-strings/"
+    },
+    {
+      "title": "Walls and Gates",
+      "url": "https://leetcode.com/problems/walls-and-gates/"
+    },
+    {
+      "title": "Graph Valid Tree",
+      "url": "https://leetcode.com/problems/graph-valid-tree/"
+    },
+    {
+      "title": "Number of Connected Components in an Undirected Graph",
+      "url": "https://leetcode.com/problems/number-of-connected-components-in-an-undirected-graph/"
+    },
+    {
+      "title": "Alien Dictionary",
+      "url": "https://leetcode.com/problems/alien-dictionary/"
+    },
+    {
+      "title": "Meeting Rooms",
+      "url": "https://leetcode.com/problems/meeting-rooms/"
+    },
+    {
+      "title": "Meeting Rooms II",
+      "url": "https://leetcode.com/problems/meeting-rooms-ii/"
+    }
+  ]
+}
