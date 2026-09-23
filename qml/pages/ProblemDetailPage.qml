@@ -5,6 +5,7 @@ import "../components"
 Page {
     id: page
     property var problem: app.detail
+    property var displayedProblemId: null
     property bool hasUnsavedChanges: titleField.text !== problem.title || urlField.text !== problem.url ||
         difficulty.currentText !== problem.difficulty || tags.text !== problem.tags.join("; ") ||
         notes.text !== problem.notes || solution.text !== problem.solution
@@ -14,6 +15,10 @@ Page {
         titleField.text = problem.title; urlField.text = problem.url
         difficulty.currentIndex = difficulty.model.indexOf(problem.difficulty)
         tags.text = problem.tags.join("; "); notes.text = problem.notes; solution.text = problem.solution
+        if (displayedProblemId !== problem.id) {
+            displayedProblemId = problem.id
+            Qt.callLater(detailScroll.scrollToTop)
+        }
     }
     function save() { return app.saveProblem({title: titleField.text, url: urlField.text, difficulty: difficulty.currentText, tags: tags.text, notes: notes.text, solution: solution.text}) }
     Component.onCompleted: syncFields()
@@ -26,10 +31,34 @@ Page {
             Button { objectName: "saveProblemButton"; text: "Save  Ctrl+S"; highlighted: true; enabled: page.hasUnsavedChanges; onClicked: page.save() }
         }
         ScrollView {
+            id: detailScroll
+            objectName: "detailScroll"
             Layout.fillWidth: true; Layout.fillHeight: true
+            clip: true
             contentWidth: availableWidth
+            contentHeight: detailForm.implicitHeight
+            // Keep a stable gutter outside the form, including when the bar is idle.
+            rightPadding: detailScrollBar.width + 10
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical: ScrollBar {
+                id: detailScrollBar
+                objectName: "detailScrollBar"
+                parent: detailScroll
+                x: detailScroll.width - width
+                y: detailScroll.topPadding
+                height: detailScroll.availableHeight
+                policy: ScrollBar.AlwaysOn
+                visible: detailScroll.contentHeight > detailScroll.availableHeight
+            }
+            function scrollToTop() {
+                contentItem.cancelFlick()
+                contentItem.contentY = 0
+            }
             ColumnLayout {
-                width: parent.width
+                id: detailForm
+                objectName: "detailForm"
+                width: detailScroll.availableWidth
+                height: implicitHeight
                 spacing: 12
                 Label { textFormat: Text.PlainText; text: "Title" }
                 TextField { id: titleField; objectName: "problemTitle"; Layout.fillWidth: true; placeholderText: "Problem title" }
@@ -44,9 +73,9 @@ Page {
                 Label { textFormat: Text.PlainText; text: "Tags (separate with semicolons)" }
                 TextField { id: tags; Layout.fillWidth: true; placeholderText: "Arrays; Hashing; Custom tag" }
                 Label { textFormat: Text.PlainText; text: "Notes" }
-                NoteArea { id: notes; Layout.fillWidth: true; Layout.minimumHeight: 120; wrapMode: TextEdit.Wrap; selectByMouse: true; textFormat: TextEdit.PlainText }
+                NoteArea { id: notes; objectName: "detailNotes"; Layout.fillWidth: true; Layout.minimumHeight: 120; wrapMode: TextEdit.Wrap; selectByMouse: true; textFormat: TextEdit.PlainText }
                 Label { textFormat: Text.PlainText; text: "Canonical solution" }
-                NoteArea { id: solution; Layout.fillWidth: true; Layout.minimumHeight: 220; font.family: "monospace"; wrapMode: TextEdit.Wrap; selectByMouse: true; textFormat: TextEdit.PlainText }
+                NoteArea { id: solution; objectName: "detailSolution"; Layout.fillWidth: true; Layout.minimumHeight: 220; font.family: "monospace"; wrapMode: TextEdit.Wrap; selectByMouse: true; textFormat: TextEdit.PlainText }
                 Label { textFormat: Text.PlainText; visible: problem.id > 0; text: "Review progress"; font.pixelSize: 20; font.bold: true; Layout.topMargin: 16 }
                 Label { textFormat: Text.PlainText; visible: problem.id > 0; text: problem.learned ? "Learned  ·  Stage " + (problem.stage + 1) + "  ·  PASS " + problem.passes + "  /  FAIL " + problem.failures : "Not learned" }
                 Label { textFormat: Text.PlainText; visible: problem.id > 0; text: "First learned: " + (problem.firstLearned || "—") + "   ·   Last review: " + (problem.lastReview || "—") + "   ·   Next review: " + (problem.nextReview || "—"); wrapMode: Text.Wrap; Layout.fillWidth: true }

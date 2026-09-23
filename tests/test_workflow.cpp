@@ -90,6 +90,66 @@ private slots:
         if (!qEnvironmentVariableIsEmpty("LEETREPEAT_TEST_SCREENSHOT")) window->grabWindow().save(qEnvironmentVariable("LEETREPEAT_TEST_SCREENSHOT"));
         QVERIFY2(warnings.isEmpty(),qPrintable(warnings.join('\n')));
     }
+    void detailScrolling() {
+        QTemporaryDir dir; Database db(dir.filePath("scrolling.sqlite")); Repository repo(db);
+        Problem a; a.title="Long solution"; a.url="https://leetcode.com/problems/long";
+        a.notes=QString("Remember this invariant.\n").repeated(30);
+        a.solution=QString("    // reproduce the implementation from memory\n").repeated(100);
+        const auto first=repo.add(a);
+        Problem b; b.title="Another problem"; b.url="https://leetcode.com/problems/another";
+        const auto second=repo.add(b);
+        AppController controller(repo);
+        QQmlApplicationEngine engine;
+        QSignalSpy warnings(&engine,&QQmlEngine::warnings);
+        engine.rootContext()->setContextProperty("app",&controller);
+        engine.load(QUrl::fromLocalFile(QStringLiteral(QML_SOURCE_DIR "/qml/Main.qml")));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window=qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        window->resize(800,640); window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        QVERIFY(controller.selectProblem(first));
+        QVERIFY(QMetaObject::invokeMethod(window,"showPage",Q_ARG(QVariant,QString("detail"))));
+        auto scroll=window->findChild<QQuickItem *>("detailScroll"); QVERIFY(scroll);
+        auto bar=window->findChild<QQuickItem *>("detailScrollBar"); QVERIFY(bar);
+        auto form=window->findChild<QQuickItem *>("detailForm"); QVERIFY(form);
+        auto notes=window->findChild<QQuickItem *>("detailNotes"); QVERIFY(notes);
+        auto solution=window->findChild<QQuickItem *>("detailSolution"); QVERIFY(solution);
+        auto viewport=scroll->property("contentItem").value<QQuickItem *>(); QVERIFY(viewport);
+        QTRY_VERIFY(scroll->property("contentHeight").toReal()>scroll->height()*2);
+        QTRY_COMPARE(viewport->property("contentY").toReal(),0.0);
+        // The scrollbar must sit outside the form and both editor backgrounds.
+        auto gutterClear=[&] {
+            const qreal left=bar->mapToScene(QPointF(0,0)).x();
+            for (auto item : {form,notes,solution})
+                if (item->mapToScene(QPointF(item->width(),0)).x()>left-8) return false;
+            return true;
+        };
+        QTRY_VERIFY(gutterClear());
+        const QPoint thumb=bar->mapToScene(QPointF(bar->width()/2,bar->height()*bar->property("size").toReal()/2)).toPoint();
+        const QPoint lower=bar->mapToScene(QPointF(bar->width()/2,bar->height()*0.65)).toPoint();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,thumb);
+        QTest::mouseMove(window,lower,100);
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,lower);
+        QTRY_VERIFY(viewport->property("contentY").toReal()>100);
+        if (!qEnvironmentVariableIsEmpty("LEETREPEAT_TEST_SCREENSHOT")) {
+            QTest::qWait(50);
+            window->grabWindow().save(qEnvironmentVariable("LEETREPEAT_TEST_SCREENSHOT")+"-detail-scrolled.png");
+        }
+        const qreal scrolled=viewport->property("contentY").toReal();
+        const qreal formY=form->mapToScene(QPointF(0,0)).y();
+        QVERIFY(formY<scroll->mapToScene(QPointF(0,0)).y());
+        // Saving this problem preserves position; selecting another resets it.
+        notes->setProperty("text",a.notes+"Saved note");
+        auto save=window->findChild<QObject *>("saveProblemButton"); QVERIFY(save);
+        QVERIFY(QMetaObject::invokeMethod(save,"clicked"));
+        QTRY_VERIFY(qAbs(viewport->property("contentY").toReal()-scrolled)<2);
+        QVERIFY(controller.selectProblem(second));
+        QTRY_COMPARE(viewport->property("contentY").toReal(),0.0);
+        QVERIFY(controller.selectProblem(first));
+        QTRY_COMPARE(viewport->property("contentY").toReal(),0.0);
+        window->resize(1120,820);
+        QTRY_VERIFY(gutterClear());
+        QCOMPARE(warnings.count(),0);
+    }
     void importPreviewAndCommit() {
         QTemporaryDir dir; Database db(dir.filePath("imports.sqlite")); Repository repo(db); AppController app(repo);
         auto path=dir.filePath("input.csv");
