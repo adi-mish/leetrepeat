@@ -17,6 +17,18 @@ Page {
             width: parent.width
             spacing: 18
             Label { textFormat: Text.PlainText; text: "Settings"; font.pixelSize: 28; font.bold: true }
+            Label { textFormat: Text.PlainText; text: "Appearance"; font.bold: true }
+            ComboBox {
+                id: appearance
+                objectName: "appearanceSelector"
+                model: ["System", "Light", "Dark"]
+                currentIndex: model.indexOf(app.settings.appearance)
+                onActivated: {
+                    if (!app.setAppearance(currentText))
+                        currentIndex = model.indexOf(app.settings.appearance)
+                }
+            }
+            Label { textFormat: Text.PlainText; text: "Applies immediately and is saved automatically. System follows your Qt desktop palette."; wrapMode: Text.Wrap; Layout.fillWidth: true; opacity: 0.7 }
             Label { textFormat: Text.PlainText; text: "New problems per day"; font.bold: true }
             SpinBox { id: daily; from: 0; to: 1000; editable: true }
             Label { textFormat: Text.PlainText; text: "Set to 0 to focus only on reviews. The default is 3."; opacity: 0.7 }

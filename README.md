@@ -23,7 +23,7 @@ cmake --build build
 ./build/leetrepeat
 ```
 
-Requires Qt **6.2+**, CMake **3.21+**, and a C++20 compiler. Qt Quick Controls uses the Fusion style by default, honoring Qt's palette. You may select another installed Qt Quick Controls style using `QT_QUICK_CONTROLS_STYLE`.
+Requires Qt **6.2+**, CMake **3.21+**, and a C++20 compiler. Qt Quick Controls uses the Fusion style by default. **Settings → Appearance** offers **System**, **Light**, and **Dark** modes. Changes apply immediately and persist across restarts; System uses Qt's desktop palette (which depends on the platform's theme integration). You may select another installed Qt Quick Controls style using `QT_QUICK_CONTROLS_STYLE`.
 
 If a QML module or plugin is reported missing, install the complete runtime list above. In particular, `qt6-declarative-dev` alone does not install the QML Controls, Templates, Dialogs, and WorkerScript plugins. Qt SQL also requires the separate SQLite driver package.
 

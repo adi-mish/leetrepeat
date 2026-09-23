@@ -24,7 +24,7 @@ void AppController::reload() {
     m_tags.sort(Qt::CaseInsensitive); m_problems.setProblems(all);
     m_stats=m_repo.stats(QDate::currentDate()); auto s=m_repo.settings();
     QStringList intervals; for (int n : s.intervals) intervals.append(QString::number(n));
-    m_settings={{"newPerDay",s.newPerDay},{"intervals",intervals.join(',')},{"shuffle",s.shuffle},{"jitter",s.jitter}};
+    m_settings={{"appearance",s.appearance},{"newPerDay",s.newPerDay},{"intervals",intervals.join(',')},{"shuffle",s.shuffle},{"jitter",s.jitter}};
     emit refreshed();
 }
 bool AppController::refresh() { return run([&]{reload();}); }
@@ -45,9 +45,15 @@ bool AppController::saveProblem(const QVariantMap &fields) {
 }
 bool AppController::resetProblem(qint64 id) { return run([&]{m_repo.reset(id); reload(); selectProblem(id);},"Progress reset. Review history has been retained."); }
 bool AppController::deleteProblem(qint64 id) { return run([&]{m_repo.remove(id); reload(); newProblem();},"Problem deleted from the library. Historical attempts have been retained in the database."); }
+bool AppController::setAppearance(const QString &appearance) {
+    return run([&]{
+        auto s=m_repo.settings(); s.appearance=appearance;
+        m_repo.saveSettings(s); reload();
+    });
+}
 bool AppController::saveSettings(int newPerDay,const QString &intervals,bool shuffle,bool jitter) {
     return run([&]{
-        Settings s; s.newPerDay=newPerDay; s.shuffle=shuffle; s.jitter=jitter; s.intervals.clear();
+        auto s=m_repo.settings(); s.newPerDay=newPerDay; s.shuffle=shuffle; s.jitter=jitter; s.intervals.clear();
         for (const auto &field : intervals.split(',')) {
             bool ok=false; int value=field.trimmed().toInt(&ok);
             if (!ok || !QRegularExpression("^[0-9]+$").match(field.trimmed()).hasMatch()) throw std::runtime_error("Enter comma-separated positive integer intervals.");

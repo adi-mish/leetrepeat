@@ -40,6 +40,7 @@ public:
     Q_INVOKABLE bool saveProblem(const QVariantMap &fields);
     Q_INVOKABLE bool resetProblem(qint64 id);
     Q_INVOKABLE bool deleteProblem(qint64 id);
+    Q_INVOKABLE bool setAppearance(const QString &appearance);
     Q_INVOKABLE bool saveSettings(int newPerDay,const QString &intervals,bool shuffle,bool jitter);
     Q_INVOKABLE bool previewImport(const QUrl &url);
     Q_INVOKABLE bool commitImport();

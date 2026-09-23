@@ -155,20 +155,25 @@ Settings Repository::settings() const {
     auto q = query(m_database.connection(), "SELECT key,value FROM settings");
     while (q.next()) {
         auto key=q.value(0).toString(), value=q.value(1).toString();
+        if (key=="appearance") s.appearance=value;
         if (key=="newPerDay") s.newPerDay=value.toInt();
         if (key=="shuffle") s.shuffle=value=="true";
         if (key=="jitter") s.jitter=value=="true";
         if (key=="intervals") { s.intervals.clear(); for (const auto &n : value.split(',')) s.intervals.append(n.toInt()); }
     }
+    if (!QStringList{"System", "Light", "Dark"}.contains(s.appearance))
+        throw std::runtime_error("Appearance must be System, Light, or Dark.");
     FixedIntervalScheduler::validateIntervals(s.intervals);
     if (s.newPerDay < 0 || s.newPerDay > 1000) throw std::runtime_error("Invalid saved daily target.");
     return s;
 }
 void Repository::saveSettings(const Settings &s) {
+    if (!QStringList{"System", "Light", "Dark"}.contains(s.appearance))
+        throw std::runtime_error("Appearance must be System, Light, or Dark.");
     FixedIntervalScheduler::validateIntervals(s.intervals);
     if (s.newPerDay < 0 || s.newPerDay > 1000) throw std::runtime_error("New problems per day must be between 0 and 1000.");
     QStringList intervals; for (int n : s.intervals) intervals.append(QString::number(n));
-    QVariantMap values{{"newPerDay", QString::number(s.newPerDay)}, {"intervals", intervals.join(',')},
+    QVariantMap values{{"appearance", s.appearance}, {"newPerDay", QString::number(s.newPerDay)}, {"intervals", intervals.join(',')},
                        {"shuffle", s.shuffle ? "true" : "false"}, {"jitter", s.jitter ? "true" : "false"}};
     Transaction tx(m_database.connection());
     for (auto it=values.cbegin(); it!=values.cend(); ++it)

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import "pages"
+import "components"
 ApplicationWindow {
     id: window
     objectName: "mainWindow"
@@ -10,6 +11,9 @@ ApplicationWindow {
     width: 1120; height: 820
     minimumWidth: 800; minimumHeight: 640
     title: "LeetRepeat"
+    palette: app.settings.appearance === "System" ? systemPalette : appearancePalette
+    Palette { id: systemPalette }
+    ThemePalette { id: appearancePalette; darkMode: app.settings.appearance === "Dark" }
     property string currentPage: "today"
     property var pendingAction: null
     property bool closingApproved: false

@@ -33,6 +33,7 @@ set(APP_QML_FILES
     qml/StartupError.qml
     qml/components/StatCard.qml
     qml/components/NoteArea.qml
+    qml/components/ThemePalette.qml
     qml/pages/TodayPage.qml
     qml/pages/ReviewPage.qml
     qml/pages/ProblemLibraryPage.qml

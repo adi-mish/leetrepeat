@@ -26,6 +26,7 @@ struct Problem {
     QVariantMap toVariant() const;
 };
 struct Settings {
+    QString appearance = QStringLiteral("System");
     int newPerDay = 3;
     QList<int> intervals{1, 2, 4, 7, 14, 30, 60, 120, 240};
     bool shuffle = true, jitter = false;
