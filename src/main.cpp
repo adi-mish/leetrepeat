@@ -8,6 +8,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QStandardPaths>
+#include <QSysInfo>
 #include <QTimer>
 #include <cstdio>
 
@@ -22,6 +23,15 @@ static int startupFailure(QGuiApplication &app, const QString &message, bool smo
 }
 
 int main(int argc,char **argv) {
+#ifdef Q_OS_LINUX
+    // Installing qt6-wayland can change Qt's automatic choice under WSLg.
+    // Prefer the XWayland path there to avoid focus/activation rendering glitches.
+    // Explicit QT_QPA_PLATFORM or Qt's -platform argument still takes precedence.
+    const bool isWsl = !qEnvironmentVariableIsEmpty("WSL_DISTRO_NAME")
+                       || QSysInfo::kernelVersion().contains("microsoft", Qt::CaseInsensitive);
+    if (isWsl && !qEnvironmentVariableIsEmpty("DISPLAY") && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+        qputenv("QT_QPA_PLATFORM", "xcb");
+#endif
     QGuiApplication app(argc,argv);
     QCoreApplication::setOrganizationName("LeetRepeat");
     QCoreApplication::setApplicationName("LeetRepeat");

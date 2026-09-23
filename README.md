@@ -27,6 +27,15 @@ Requires Qt **6.2+**, CMake **3.21+**, and a C++20 compiler. Qt Quick Controls u
 
 If a QML module or plugin is reported missing, install the complete runtime list above. In particular, `qt6-declarative-dev` alone does not install the QML Controls, Templates, Dialogs, and WorkerScript plugins. Qt SQL also requires the separate SQLite driver package.
 
+Under **WSLg**, LeetRepeat defaults to X11/XWayland (`xcb`) when `DISPLAY` is available. This keeps installing `qt6-wayland` from switching the app to a Wayland path that can show transient blurry text on focus changes. Native Linux, Windows, and macOS retain Qt's normal platform selection. An explicit `QT_QPA_PLATFORM` or Qt `-platform` argument overrides this default:
+
+```bash
+QT_QPA_PLATFORM=xcb ./build/leetrepeat      # X11/XWayland
+QT_QPA_PLATFORM=wayland ./build/leetrepeat  # Opt into Wayland
+```
+
+Qt documents these overrides in [QGuiApplication](https://doc.qt.io/qt-6/qguiapplication.html).
+
 ## Daily use
 
 1. Open **Problems**, then **Import CSV** or **Add problem**.
