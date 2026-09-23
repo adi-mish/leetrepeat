@@ -19,7 +19,14 @@ Page {
             Button { text: "Import CSV"; onClicked: page.importProblems() }
             Button { text: "Export CSV"; onClicked: page.exportProblems() }
         }
-        TextField { id: search; objectName: "librarySearch"; Layout.fillWidth: true; placeholderText: "Search by title…"; onTextChanged: page.applyFilters() }
+        TextField {
+            id: search
+            objectName: "librarySearch"
+            Layout.fillWidth: true
+            placeholderText: "Search by title…"
+            placeholderTextColor: palette.text
+            onTextChanged: page.applyFilters()
+        }
         RowLayout {
             Layout.fillWidth: true
             ComboBox { id: status; model: ["All", "Not learned", "Learned", "Due", "Overdue"]; onActivated: page.applyFilters() }
@@ -28,7 +35,13 @@ Page {
         }
         RowLayout {
             Layout.fillWidth: true
-            TextField { id: tags; Layout.fillWidth: true; placeholderText: "Filter by tags (all must match; separate with ;)"; onTextChanged: page.applyFilters() }
+            TextField {
+                id: tags
+                Layout.fillWidth: true
+                placeholderText: "Filter by tags (all must match; separate with ;)"
+                placeholderTextColor: palette.text
+                onTextChanged: page.applyFilters()
+            }
             ComboBox {
                 id: tagPicker
                 model: ["Add tag filter…"].concat(app.tags)
