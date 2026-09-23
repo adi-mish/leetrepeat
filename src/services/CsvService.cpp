@@ -40,7 +40,7 @@ QList<QStringList> CsvService::parse(const QString &input) {
 ImportPreview CsvService::preview(const QString &path, const QList<Problem> &existing) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) fail(file.errorString());
-    QStringDecoder decoder(QStringDecoder::Utf8);
+    QStringDecoder decoder(QStringDecoder::Utf8, QStringConverter::Flag::Stateless);
     QString content=decoder.decode(file.readAll());
     if (decoder.hasError()) fail("CSV must use UTF-8 encoding.");
     auto records=parse(content);

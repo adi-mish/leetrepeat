@@ -81,8 +81,10 @@ bool AppController::exportCsv(const QUrl &url) { return run([&]{
     auto dbPath=QFileInfo(databasePath()).canonicalFilePath();
     auto canonical=QFileInfo(path).canonicalFilePath();
     auto absolute=QFileInfo(path).absoluteFilePath();
-    if ((!canonical.isEmpty() && canonical==dbPath) || absolute==dbPath+"-wal" || absolute==dbPath+"-shm")
-        throw std::runtime_error("Cannot export over the active database.");
+    for (const auto &suffix : QStringList{"", "-wal", "-shm", ".lock"}) {
+        if ((!canonical.isEmpty() && canonical==dbPath+suffix) || absolute==dbPath+suffix)
+            throw std::runtime_error("Cannot export over the active database or its supporting files.");
+    }
     CsvService::exportProblems(path,m_repo.problems());
 },"CSV exported."); }
 bool AppController::backup(const QUrl &url) { return run([&]{m_repo.database().backup(localPath(url));},"Database backup saved."); }

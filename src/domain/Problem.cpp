@@ -3,6 +3,7 @@
 #include <QSet>
 #include <QUrl>
 #include <stdexcept>
+#include <algorithm>
 
 namespace lr {
 QJsonObject SchedulerState::toJson() const {

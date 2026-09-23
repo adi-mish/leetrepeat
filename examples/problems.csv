@@ -1,0 +1,7 @@
+title,url,difficulty,notes,solution,tags
+Two Sum,https://leetcode.com/problems/two-sum/,Easy,,,Arrays;Hashing
+3Sum,https://leetcode.com/problems/3sum/,Medium,,,Arrays;Two Pointers;Sorting
+Minimum Window Substring,https://leetcode.com/problems/minimum-window-substring/,Hard,,,Hashing;Sliding Window
+Course Schedule,https://leetcode.com/problems/course-schedule/,Medium,,,Graphs;Topological Sort;DFS
+Coin Change,https://leetcode.com/problems/coin-change/,Medium,,,Dynamic Programming;Arrays
+Reverse Linked List,https://leetcode.com/problems/reverse-linked-list/,Easy,,,Linked List

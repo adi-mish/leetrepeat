@@ -54,8 +54,17 @@ void Repository::writeTags(const Problem &p) {
         query(db, "INSERT INTO problem_tags(problem_id,tag_id) SELECT ?,id FROM tags WHERE name_key=?", {p.id, tag.toCaseFolded()});
     }
 }
+void Repository::validateUnique(const Problem &p) const {
+    auto q = query(m_database.connection(),
+                   "SELECT title FROM problems WHERE deleted=0 AND id<>? AND (title_key=? OR url_key=?) LIMIT 1",
+                   {p.id, normalizedTitle(p.title), normalizedUrl(p.url)});
+    if (q.next())
+        throw std::runtime_error(QString("A problem with this title or URL already exists: %1").arg(q.value(0).toString()).toStdString());
+}
 qint64 Repository::insert(Problem p) {
     validateProblem(p);
+    p.id = 0;
+    validateUnique(p);
     auto now = stamp(QDateTime::currentDateTime());
     auto q = query(m_database.connection(), "INSERT INTO problems(title,title_key,url,url_key,difficulty,notes,solution,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                    {p.title, normalizedTitle(p.title), p.url, normalizedUrl(p.url), p.difficulty, text(p.notes), text(p.solution), now, now});
@@ -76,6 +85,7 @@ void Repository::edit(Problem p) {
     validateProblem(p);
     Transaction tx(m_database.connection());
     problem(p.id);
+    validateUnique(p);
     query(m_database.connection(), "UPDATE problems SET title=?,title_key=?,url=?,url_key=?,difficulty=?,notes=?,solution=?,updated_at=? WHERE id=?",
           {p.title, normalizedTitle(p.title), p.url, normalizedUrl(p.url), p.difficulty, text(p.notes), text(p.solution), stamp(QDateTime::currentDateTime()), p.id});
     writeTags(p); tx.commit();
@@ -136,7 +146,7 @@ QVariantMap Repository::stats(QDate date) const {
     int learnedToday = learnedOn(date);
     int unseen = int(all.size()) - learned;
     int newCount = std::min(unseen, std::max(0, settings().newPerDay - learnedToday));
-    return {{"total", all.size()}, {"learned", learned}, {"unlearned", unseen}, {"due", due}, {"overdue", overdue},
+    return {{"date", date}, {"total", all.size()}, {"learned", learned}, {"unlearned", unseen}, {"due", due}, {"overdue", overdue},
             {"learnedToday", learnedToday}, {"passesToday", passes}, {"failuresToday", failures},
             {"completedToday", passes + failures + learnedToday}, {"newCount", newCount}, {"remaining", due + newCount}};
 }

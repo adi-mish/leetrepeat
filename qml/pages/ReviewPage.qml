@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 Page {
     id: page
     property var review: app.review
@@ -20,16 +21,16 @@ Page {
             Layout.fillWidth: true
             Button { text: "‹ Today  Esc"; onClicked: page.back() }
             Item { Layout.fillWidth: true }
-            Label { text: review.completed + " completed  ·  " + review.remaining + " remaining" }
+            Label { textFormat: Text.PlainText; text: review.completed + " completed  ·  " + review.remaining + " remaining" }
         }
-        Label { visible: !review.active; text: "Session complete"; font.pixelSize: 30; font.bold: true }
-        Label { visible: !review.active; text: "Your progress is saved. Come back when the next reviews are due."; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        Label { textFormat: Text.PlainText; visible: !review.active; text: "Session complete"; font.pixelSize: 30; font.bold: true }
+        Label { textFormat: Text.PlainText; visible: !review.active; text: "Your progress is saved. Come back when the next reviews are due."; wrapMode: Text.Wrap; Layout.fillWidth: true }
         Button { visible: !review.active; text: "Back to Today"; highlighted: true; onClicked: page.back() }
-        Label { visible: review.active; text: problem.learned ? "REVIEW" : "NEW PROBLEM"; opacity: 0.7; font.letterSpacing: 2 }
-        Label { visible: review.active; text: problem.title; font.pixelSize: 28; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true }
-        Label { visible: review.active; text: problem.difficulty + (problem.tags.length ? "  ·  " + problem.tags.join(" · ") : ""); opacity: 0.8; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        Label { textFormat: Text.PlainText; visible: review.active; text: problem.learned ? "REVIEW" : "NEW PROBLEM"; opacity: 0.7; font.letterSpacing: 2 }
+        Label { textFormat: Text.PlainText; visible: review.active; text: problem.title; font.pixelSize: 28; font.bold: true; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        Label { textFormat: Text.PlainText; visible: review.active; text: problem.difficulty + (problem.tags.length ? "  ·  " + problem.tags.join(" · ") : ""); opacity: 0.8; wrapMode: Text.Wrap; Layout.fillWidth: true }
         Button { visible: review.active; text: "Open on LeetCode  O"; onClicked: review.openUrl() }
-        Label { visible: review.active; text: problem.learned ? "Reproduce the solution from memory." : "Study or solve this problem, then save what you want to recall."; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        Label { textFormat: Text.PlainText; visible: review.active; text: problem.learned ? "Reproduce the solution from memory." : "Study or solve this problem, then save what you want to recall."; wrapMode: Text.Wrap; Layout.fillWidth: true }
         Button { visible: page.reviewing; text: review.revealed ? "Hide Notes / Solution  Space" : "Reveal Notes / Solution  Space"; onClicked: review.revealed = !review.revealed }
         ScrollView {
             Layout.fillWidth: true; Layout.fillHeight: true
@@ -38,8 +39,8 @@ Page {
             ColumnLayout {
                 width: parent.width
                 spacing: 12
-                Label { visible: !problem.learned || review.revealed; text: "Notes"; font.bold: true }
-                TextArea {
+                Label { textFormat: Text.PlainText; visible: !problem.learned || review.revealed; text: "Notes"; font.bold: true }
+                NoteArea {
                     id: notes
                     objectName: "studyNotes"
                     visible: !problem.learned || review.revealed
@@ -51,8 +52,8 @@ Page {
                     placeholderText: problem.learned ? "No notes saved." : "Algorithm, invariants, pitfalls…"
                     textFormat: TextEdit.PlainText
                 }
-                Label { visible: !problem.learned || review.revealed; text: "Canonical solution"; font.bold: true }
-                TextArea {
+                Label { textFormat: Text.PlainText; visible: !problem.learned || review.revealed; text: "Canonical solution"; font.bold: true }
+                NoteArea {
                     id: solution
                     objectName: "studySolution"
                     visible: !problem.learned || review.revealed
@@ -78,7 +79,7 @@ Page {
             visible: review.active && !problem.learned
             Button { text: "Save notes"; enabled: page.hasUnsavedChanges; onClicked: review.saveStudy(notes.text, solution.text) }
             Button { objectName: "markLearnedButton"; text: "Mark Learned"; highlighted: true; onClicked: review.markLearned(notes.text, solution.text) }
-            Label { text: "First review: tomorrow"; opacity: 0.7 }
+            Label { textFormat: Text.PlainText; text: "First review: tomorrow"; opacity: 0.7 }
         }
     }
     Shortcut { sequence: "P"; autoRepeat: false; enabled: page.visible && page.reviewing; onActivated: review.grade(true) }

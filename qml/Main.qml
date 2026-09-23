@@ -35,12 +35,12 @@ ApplicationWindow {
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 20; anchors.rightMargin: 20
-            Label { text: "LeetRepeat"; font.bold: true; font.pixelSize: 20; Layout.rightMargin: 24 }
+            Label { textFormat: Text.PlainText; text: "LeetRepeat"; font.bold: true; font.pixelSize: 20; Layout.rightMargin: 24 }
             ToolButton { text: "Today"; checked: window.currentPage === "today" || window.currentPage === "review"; onClicked: window.navigate("today") }
             ToolButton { text: "Problems"; checked: ["library", "detail", "import"].indexOf(window.currentPage) >= 0; onClicked: window.navigate("library") }
             ToolButton { text: "Settings"; checked: window.currentPage === "settings"; onClicked: window.navigate("settings") }
             Item { Layout.fillWidth: true }
-            Label { text: app.stats.remaining + " remaining today"; opacity: 0.7 }
+            Label { textFormat: Text.PlainText; text: app.stats.remaining + " remaining today"; opacity: 0.7 }
         }
     }
     ColumnLayout {
@@ -51,7 +51,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             RowLayout {
                 anchors.fill: parent
-                Label { text: (app.messageIsError ? "Error: " : "") + app.message; wrapMode: Text.Wrap; Layout.fillWidth: true; font.bold: app.messageIsError }
+                Label { textFormat: Text.PlainText; text: (app.messageIsError ? "Error: " : "") + app.message; wrapMode: Text.Wrap; Layout.fillWidth: true; font.bold: app.messageIsError }
                 ToolButton { text: "Dismiss"; onClicked: app.clearMessage() }
             }
         }
@@ -78,7 +78,7 @@ ApplicationWindow {
         width: 420
         modal: true
         standardButtons: Dialog.Discard | Dialog.Cancel
-        Label { width: parent.width; text: "Your edits have not been saved. Discard them to continue, or cancel and save first."; wrapMode: Text.Wrap }
+        Label { textFormat: Text.PlainText; width: parent.width; text: "Your edits have not been saved. Discard them to continue, or cancel and save first."; wrapMode: Text.Wrap }
         onDiscarded: { var action = window.pendingAction; window.pendingAction = null; if (action) action() }
         onRejected: window.pendingAction = null
     }

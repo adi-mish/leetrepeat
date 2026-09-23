@@ -2,6 +2,7 @@
 #include <QCommandLineParser>
 #include <QDir>
 #include <QGuiApplication>
+#include <QFileInfo>
 #include <QLockFile>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -9,6 +10,16 @@
 #include <QStandardPaths>
 #include <QTimer>
 #include <cstdio>
+
+static int startupFailure(QGuiApplication &app, const QString &message, bool smokeTest) {
+    std::fprintf(stderr, "LeetRepeat could not start: %s\n", qPrintable(message));
+    if (smokeTest) return 1;
+    QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("startupError", message);
+    engine.load(QUrl(QStringLiteral("qrc:/qml/StartupError.qml")));
+    if (!engine.rootObjects().isEmpty()) app.exec();
+    return 1;
+}
 
 int main(int argc,char **argv) {
     QGuiApplication app(argc,argv);
@@ -24,9 +35,11 @@ int main(int argc,char **argv) {
     auto path=parser.value("database");
     if (path.isEmpty()) path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/leetrepeat.sqlite";
     path=QFileInfo(path).absoluteFilePath();
-    if (!QDir().mkpath(QFileInfo(path).absolutePath())) { std::fprintf(stderr,"Cannot create data directory.\n"); return 1; }
+    if (!QDir().mkpath(QFileInfo(path).absolutePath()))
+        return startupFailure(app, "Cannot create data directory: " + QFileInfo(path).absolutePath(), parser.isSet("smoke-test"));
     QLockFile lock(path+".lock");
-    if (!lock.tryLock()) { std::fprintf(stderr,"The database is already in use, or its lock cannot be created: %s\n",qPrintable(path)); return 1; }
+    if (!lock.tryLock())
+        return startupFailure(app, "The database is already in use, or its lock cannot be created: " + path, parser.isSet("smoke-test"));
     try {
         lr::Database database(path);
         lr::Repository repository(database);
@@ -41,7 +54,6 @@ int main(int argc,char **argv) {
         if (parser.isSet("smoke-test")) QTimer::singleShot(1000,&app,&QCoreApplication::quit);
         return app.exec();
     } catch (const std::exception &e) {
-        std::fprintf(stderr,"LeetRepeat could not start: %s\nDatabase: %s\n",e.what(),qPrintable(path));
-        return 1;
+        return startupFailure(app, QString::fromUtf8(e.what()) + "\nDatabase: " + path, parser.isSet("smoke-test"));
     }
 }

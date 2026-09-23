@@ -14,7 +14,7 @@ Page {
         anchors.fill: parent
         spacing: 14
         RowLayout {
-            Label { text: "Problems"; font.pixelSize: 28; font.bold: true; Layout.fillWidth: true }
+            Label { textFormat: Text.PlainText; text: "Problems"; font.pixelSize: 28; font.bold: true; Layout.fillWidth: true }
             Button { text: "Add problem"; onClicked: page.addProblem() }
             Button { text: "Import CSV"; onClicked: page.importProblems() }
             Button { text: "Export CSV"; onClicked: page.exportProblems() }
@@ -35,7 +35,7 @@ Page {
                 onActivated: { if (currentIndex > 0) tags.text += (tags.text.trim().length ? "; " : "") + currentText; currentIndex = 0 }
             }
         }
-        Label { text: app.problems.count + " problems"; opacity: 0.7 }
+        Label { textFormat: Text.PlainText; text: app.problems.count + " problems"; opacity: 0.7 }
         ListView {
             id: list
             objectName: "problemList"
@@ -54,18 +54,18 @@ Page {
                 contentItem: ColumnLayout {
                     spacing: 4
                     RowLayout {
-                        Label { text: problem.title; font.bold: true; font.pixelSize: 16; elide: Text.ElideRight; Layout.fillWidth: true }
-                        Label { text: problem.difficulty; opacity: 0.8 }
+                        Label { textFormat: Text.PlainText; text: problem.title; font.bold: true; font.pixelSize: 16; elide: Text.ElideRight; Layout.fillWidth: true }
+                        Label { textFormat: Text.PlainText; text: problem.difficulty; opacity: 0.8 }
                     }
-                    Label {
+                    Label { textFormat: Text.PlainText;
                         text: problem.learned ? "Learned  ·  Stage " + (problem.stage + 1) + "  ·  Next: " + problem.nextReview + "  ·  PASS " + problem.passes + "  /  FAIL " + problem.failures : "Not learned"
                         elide: Text.ElideRight; Layout.fillWidth: true; opacity: 0.8
                     }
-                    Label { text: problem.tags.join(" · "); elide: Text.ElideRight; Layout.fillWidth: true; opacity: 0.6 }
+                    Label { textFormat: Text.PlainText; text: problem.tags.join(" · "); elide: Text.ElideRight; Layout.fillWidth: true; opacity: 0.6 }
                 }
                 Keys.onReturnPressed: page.editProblem(problem.id)
             }
-            Label { anchors.centerIn: parent; visible: list.count === 0; text: "No matching problems."; opacity: 0.7 }
+            Label { textFormat: Text.PlainText; anchors.centerIn: parent; visible: list.count === 0; text: "No matching problems."; opacity: 0.7 }
         }
     }
     Component.onCompleted: applyFilters()

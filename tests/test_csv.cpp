@@ -15,6 +15,13 @@ private slots:
         QCOMPARE(preview.ready[0].notes,p.notes); QCOMPARE(preview.ready[0].title,p.title); QCOMPARE(preview.ready[0].tags,p.tags);
         auto duplicate=CsvService::preview(path,{p}); QCOMPARE(duplicate.duplicates,1); QVERIFY(duplicate.ready.isEmpty());
     }
+    void invalidUtf8() {
+        QTemporaryDir dir; auto path=dir.filePath("invalid.csv");
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("title,url\nA,https://leetcode.com/problems/a/");
+        file.write(QByteArray::fromHex("e282")); file.close();
+        QVERIFY_EXCEPTION_THROWN(CsvService::preview(path,{}),std::runtime_error);
+    }
     void invalidAndDuplicates() {
         QVERIFY_EXCEPTION_THROWN(CsvService::parse("a,\"broken"),std::runtime_error);
         QVERIFY_EXCEPTION_THROWN(CsvService::parse("a,\"b\"x"),std::runtime_error);

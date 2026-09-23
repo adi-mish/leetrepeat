@@ -14,8 +14,8 @@ Page {
         ColumnLayout {
             width: parent.width
             spacing: 24
-            Label { text: "Today"; font.pixelSize: 30; font.bold: true }
-            Label { text: Qt.formatDate(new Date(), "dddd, MMMM d"); opacity: 0.7 }
+            Label { textFormat: Text.PlainText; text: "Today"; font.pixelSize: 30; font.bold: true }
+            Label { textFormat: Text.PlainText; text: Qt.formatDate(app.stats.date, "dddd, MMMM d"); opacity: 0.7 }
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 16
@@ -23,7 +23,7 @@ Page {
                 StatCard { caption: "Reviews due"; value: app.stats.due; Layout.fillWidth: true }
                 StatCard { caption: "Remaining"; value: app.stats.remaining; Layout.fillWidth: true }
             }
-            Label {
+            Label { textFormat: Text.PlainText;
                 text: app.stats.total === 0 ? "Add problems or import a CSV to begin." :
                       app.stats.remaining === 0 ? "You're done for today. Your next reviews will appear when due." :
                       "Reproduce each solution from memory. Mark PASS or FAIL and keep going."
@@ -39,7 +39,7 @@ Page {
                 onClicked: page.startSession()
             }
             Button { text: app.stats.total === 0 ? "Add or import problems" : "Browse problems"; onClicked: page.openLibrary() }
-            Label { text: "Your corpus"; font.pixelSize: 20; font.bold: true; Layout.topMargin: 20 }
+            Label { textFormat: Text.PlainText; text: "Your corpus"; font.pixelSize: 20; font.bold: true; Layout.topMargin: 20 }
             GridLayout {
                 columns: page.width > 1000 ? 4 : 2
                 Layout.fillWidth: true
@@ -49,7 +49,7 @@ Page {
                 StatCard { caption: "Unlearned"; value: app.stats.unlearned; Layout.fillWidth: true }
                 StatCard { caption: "Overdue (included above)"; value: app.stats.overdue; Layout.fillWidth: true }
             }
-            Label { text: "Completed today: " + app.stats.completedToday + "  ·  Learned: " + app.stats.learnedToday + "  ·  PASS: " + app.stats.passesToday + "  ·  FAIL: " + app.stats.failuresToday; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Label { textFormat: Text.PlainText; text: "Completed today: " + app.stats.completedToday + "  ·  Learned: " + app.stats.learnedToday + "  ·  PASS: " + app.stats.passesToday + "  ·  FAIL: " + app.stats.failuresToday; wrapMode: Text.Wrap; Layout.fillWidth: true }
         }
     }
     Shortcut { sequence: "Return"; enabled: page.visible && app.stats.remaining > 0; onActivated: page.startSession() }

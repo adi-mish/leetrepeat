@@ -26,6 +26,7 @@ public:
 private:
     qint64 insert(Problem problem);
     void writeTags(const Problem &problem);
+    void validateUnique(const Problem &problem) const;
     Database &m_database;
 };
 }

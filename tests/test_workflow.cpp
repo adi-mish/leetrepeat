@@ -22,6 +22,9 @@ private slots:
         auto reviewId=repo.add(a);
         FixedIntervalScheduler scheduler;
         repo.learn(reviewId,scheduler,QDateTime::currentDateTime().addDays(-10),3);
+        Problem failed=a; failed.title="Failed review"; failed.url="https://leetcode.com/problems/failed";
+        auto failedId=repo.add(failed); repo.learn(failedId,scheduler,QDateTime::currentDateTime().addDays(-2),3);
+        Settings settings; settings.shuffle=false; repo.saveSettings(settings);
         Problem b; b.title="New problem"; b.url="https://leetcode.com/problems/new"; auto newId=repo.add(b);
         AppController controller(repo);
         QQmlApplicationEngine engine;
@@ -34,18 +37,29 @@ private slots:
         auto show=[&](const char *page){ return QMetaObject::invokeMethod(window,"showPage",Q_ARG(QVariant,QString::fromUtf8(page))); };
         auto stack=window->findChild<QObject *>("pageStack"); QVERIFY(stack);
         auto current=[&] { return stack->property("currentItem").value<QObject *>(); };
-        QTest::qWait(100);
+        auto screenshot=[&](const QString &name) {
+            auto path=qEnvironmentVariable("LEETREPEAT_TEST_SCREENSHOT");
+            if (!path.isEmpty()) window->grabWindow().save(path+"-"+name+".png");
+        };
+        window->requestActivate();
+        QVERIFY(QTest::qWaitForWindowActive(window));
         QVERIFY(controller.review()->start()); QVERIFY(show("review")); QTest::qWait(100);
         QVERIFY(controller.review()->active()); QCOMPARE(controller.review()->current()["id"].toLongLong(),reviewId);
         QVERIFY(!controller.review()->revealed());
+        screenshot("review");
         auto notes=window->findChild<QQuickItem *>("studyNotes"); QVERIFY(notes); QVERIFY(!notes->isVisible());
         QTest::keyClick(window,Qt::Key_Space); QTRY_VERIFY(controller.review()->revealed()); QVERIFY(notes->isVisible());
         QTest::keyClick(window,Qt::Key_P); QTRY_COMPARE(repo.history(reviewId).size(),1);
+        QCOMPARE(controller.review()->current()["id"].toLongLong(),failedId);
+        QTest::keyClick(window,Qt::Key_F); QTRY_COMPARE(repo.history(failedId).size(),1);
+        QCOMPARE(repo.problem(failedId).state.stage,0);
+        QCOMPARE(repo.problem(failedId).nextReview,QDate::currentDate().addDays(1));
         QCOMPARE(controller.review()->current()["id"].toLongLong(),newId);
         QVERIFY(!controller.review()->revealed());
         notes->setProperty("text","My study notes");
         auto solution=window->findChild<QQuickItem *>("studySolution"); QVERIFY(solution); solution->setProperty("text","My solution");
         QVERIFY(current()->property("hasUnsavedChanges").toBool());
+        screenshot("study");
         // Letters typed during initial study must never grade a problem.
         notes->forceActiveFocus(); QTest::keyClick(window,Qt::Key_P);
         QCOMPARE(repo.history(newId).size(),0);
@@ -54,10 +68,11 @@ private slots:
         QCOMPARE(repo.history(newId).size(),0); QCOMPARE(repo.problem(newId).nextReview,QDate::currentDate().addDays(1));
         QVERIFY(!controller.review()->active()); QCOMPARE(controller.stats()["remaining"].toInt(),0);
         QVERIFY(show("today")); QVERIFY(show("library")); QTest::qWait(50);
-        controller.problems()->filter("Review","Learned","All difficulties","arrays;HASHING","Title"); QCOMPARE(controller.problems()->rowCount(),1);
-        controller.problems()->filter("Review","All","All difficulties","trees","Title"); QCOMPARE(controller.problems()->rowCount(),0);
+        controller.problems()->filter("Review problem","Learned","All difficulties","arrays;HASHING","Title"); QCOMPARE(controller.problems()->rowCount(),1);
+        controller.problems()->filter("Review problem","All","All difficulties","trees","Title"); QCOMPARE(controller.problems()->rowCount(),0);
         QVERIFY(controller.selectProblem(reviewId)); QVERIFY(show("detail")); QTest::qWait(50);
         QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        screenshot("detail");
         auto title=window->findChild<QObject *>("problemTitle"); QVERIFY(title); title->setProperty("text","Renamed problem");
         QVERIFY(current()->property("hasUnsavedChanges").toBool());
         QVERIFY(QMetaObject::invokeMethod(window,"navigate",Q_ARG(QVariant,QString("today"))));
@@ -67,12 +82,29 @@ private slots:
         auto save=window->findChild<QObject *>("saveProblemButton"); QVERIFY(save); QVERIFY(QMetaObject::invokeMethod(save,"clicked"));
         QCOMPARE(repo.problem(reviewId).title,QString("Renamed problem")); QVERIFY(!current()->property("hasUnsavedChanges").toBool());
         QVERIFY(show("settings")); QTest::qWait(50); QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        screenshot("settings");
         QVERIFY(!controller.saveSettings(3,"1,2,2",true,false)); QVERIFY(controller.messageIsError());
         QVERIFY(controller.saveSettings(5,"1,3,7",false,true)); QCOMPARE(repo.settings().newPerDay,5);
         QVERIFY(show("import")); QTest::qWait(50);
         QVERIFY(show("today")); QTest::qWait(100);
         if (!qEnvironmentVariableIsEmpty("LEETREPEAT_TEST_SCREENSHOT")) window->grabWindow().save(qEnvironmentVariable("LEETREPEAT_TEST_SCREENSHOT"));
         QVERIFY2(warnings.isEmpty(),qPrintable(warnings.join('\n')));
+    }
+    void importPreviewAndCommit() {
+        QTemporaryDir dir; Database db(dir.filePath("imports.sqlite")); Repository repo(db); AppController app(repo);
+        auto path=dir.filePath("input.csv");
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("title,url,tags\nA,https://leetcode.com/problems/a,Arrays;Hashing\nB,broken,Arrays\n"); file.close();
+        QVERIFY(app.previewImport(QUrl::fromLocalFile(path)));
+        QVERIFY(!app.importSummary()["canImport"].toBool()); QVERIFY(!app.commitImport()); QVERIFY(repo.problems().isEmpty());
+        QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Truncate));
+        file.write("title,url,tags\nA,https://leetcode.com/problems/a,Arrays;Hashing\nB,https://leetcode.com/problems/b,Arrays\n a ,https://leetcode.com/problems/duplicate,Other\n"); file.close();
+        QVERIFY(app.previewImport(QUrl::fromLocalFile(path))); QCOMPARE(app.importSummary()["ready"].toInt(),2);
+        QCOMPARE(app.importSummary()["duplicates"].toInt(),1); QVERIFY(app.commitImport());
+        QCOMPARE(repo.problems().size(),2); QCOMPARE(repo.problems()[0].tags.size(),2);
+        QCOMPARE(app.stats()["newCount"].toInt(),2); QVERIFY(!app.commitImport());
+        auto exported=dir.filePath("export.csv"); QVERIFY(app.exportCsv(QUrl::fromLocalFile(exported)));
+        QCOMPARE(CsvService::preview(exported,{}).ready.size(),2);
     }
     void controllerFailuresAndRestart() {
         QTemporaryDir dir; auto path=dir.filePath("state.sqlite");

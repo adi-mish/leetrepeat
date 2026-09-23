@@ -30,7 +30,9 @@ qt_add_executable(leetrepeat src/main.cpp)
 target_link_libraries(leetrepeat PRIVATE leetrepeat_ui)
 set(APP_QML_FILES
     qml/Main.qml
+    qml/StartupError.qml
     qml/components/StatCard.qml
+    qml/components/NoteArea.qml
     qml/pages/TodayPage.qml
     qml/pages/ReviewPage.qml
     qml/pages/ProblemLibraryPage.qml

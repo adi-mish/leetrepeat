@@ -43,6 +43,28 @@ private slots:
         Database backup(dir.filePath("backup.sqlite")); Repository restored(backup);
         QCOMPARE(restored.problem(id).failures,1); QCOMPARE(restored.history(id).size(),2);
     }
+    void thousandProblemCorpus() {
+        QTemporaryDir dir; auto path=dir.filePath("corpus.sqlite");
+        {
+            Database db(path); Repository repo(db);
+            QList<Problem> corpus;
+            for (int i=0; i<1000; ++i) {
+                Problem p; p.title=QString("Problem %1").arg(i);
+                p.url=QString("https://leetcode.com/problems/example-%1/").arg(i);
+                p.tags={"Arrays", "Custom tag", "ARRAYS"}; corpus.append(p);
+            }
+            QCOMPARE(repo.importProblems(corpus),1000);
+            auto saved=repo.problems(); QCOMPARE(saved.size(),1000);
+            FixedIntervalScheduler scheduler;
+            for (int i=0; i<20; ++i) repo.learn(saved[i].id,scheduler,QDateTime::currentDateTime().addDays(-10),20);
+        }
+        Database db(path); Repository repo(db);
+        auto stats=repo.stats(QDate::currentDate());
+        QCOMPARE(stats["total"].toInt(),1000); QCOMPARE(stats["learned"].toInt(),20);
+        QCOMPARE(stats["due"].toInt(),20); QCOMPARE(stats["overdue"].toInt(),20);
+        QCOMPARE(stats["newCount"].toInt(),3); QCOMPARE(stats["remaining"].toInt(),23);
+        QCOMPARE(repo.problems().last().tags.size(),2);
+    }
     void atomicWritesAndQuota() {
         Database db(":memory:"); Repository repo(db); FixedIntervalScheduler scheduler;
         Problem a; a.title="A"; a.url="https://leetcode.com/problems/a";
