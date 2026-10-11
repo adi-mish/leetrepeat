@@ -90,6 +90,125 @@ private slots:
         if (!qEnvironmentVariableIsEmpty("LEETREPEAT_TEST_SCREENSHOT")) window->grabWindow().save(qEnvironmentVariable("LEETREPEAT_TEST_SCREENSHOT"));
         QVERIFY2(warnings.isEmpty(),qPrintable(warnings.join('\n')));
     }
+    void settingsUnsavedNavigation() {
+        QTemporaryDir dir; Database db(dir.filePath("settings.sqlite")); Repository repo(db);
+        AppController controller(repo);
+        QQmlApplicationEngine engine;
+        QSignalSpy warnings(&engine,&QQmlEngine::warnings);
+        engine.rootContext()->setContextProperty("app",&controller);
+        engine.load(QUrl::fromLocalFile(QStringLiteral(QML_SOURCE_DIR "/qml/Main.qml")));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window=qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        auto stack=window->findChild<QObject *>("pageStack"); QVERIFY(stack);
+        auto current=[&] { return stack->property("currentItem").value<QObject *>(); };
+        auto click=[&](QQuickItem *item) {
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,
+                              item->mapToScene(QPointF(item->width()/2,item->height()/2)).toPoint());
+        };
+        auto settingsTab=window->findChild<QQuickItem *>("settingsTab"); QVERIFY(settingsTab);
+        auto todayTab=window->findChild<QQuickItem *>("todayTab"); QVERIFY(todayTab);
+        auto dialog=window->findChild<QObject *>("discardEditsDialog"); QVERIFY(dialog);
+        click(settingsTab);
+        QTRY_COMPARE(window->property("currentPage").toString(),QString("settings"));
+        auto daily=current()->findChild<QQuickItem *>("dailyTarget"); QVERIFY(daily);
+        auto editor=daily->property("contentItem").value<QQuickItem *>(); QVERIFY(editor);
+        auto save=current()->findChild<QQuickItem *>("saveSettingsButton"); QVERIFY(save);
+        auto intervals=current()->findChild<QQuickItem *>("reviewIntervals"); QVERIFY(intervals);
+        auto type=[&](QQuickItem *field,const QString &text) {
+            field->forceActiveFocus(); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+            for (QChar ch : text) QTest::keyClick(window,ch.toLatin1());
+        };
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        editor->forceActiveFocus(); QTest::keyClick(window,Qt::Key_A,Qt::ControlModifier);
+        QTest::keyClick(window,Qt::Key_Backspace);
+        QVERIFY(current()->property("hasUnsavedChanges").toBool());
+        QVERIFY(!save->isEnabled());
+        type(editor,"3");
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        // Typing has to count before SpinBox commits on Enter or focus loss.
+        type(editor,"8");
+        QVERIFY(current()->property("hasUnsavedChanges").toBool());
+        QVERIFY(save->isEnabled());
+        click(todayTab);
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QCOMPARE(window->property("currentPage").toString(),QString("settings"));
+        QTest::keyClick(window,Qt::Key_Escape);
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(repo.settings().newPerDay,3);
+        // Re-selecting the current tab is not navigation and must retain edits.
+        click(settingsTab);
+        QVERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(current()->findChild<QQuickItem *>("dailyTarget"),daily);
+        // Save directly from the numeric editor, without first pressing Enter.
+        type(editor,"9"); click(save);
+        QTRY_COMPARE(repo.settings().newPerDay,9);
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        click(todayTab);
+        QTRY_COMPARE(window->property("currentPage").toString(),QString("today"));
+        QVERIFY(!dialog->property("visible").toBool());
+        click(settingsTab);
+        QTRY_COMPARE(window->property("currentPage").toString(),QString("settings"));
+        intervals=current()->findChild<QQuickItem *>("reviewIntervals"); QVERIFY(intervals);
+        save=current()->findChild<QQuickItem *>("saveSettingsButton"); QVERIFY(save);
+        // Invalid saves stay dirty; normalized successful saves become clean.
+        type(intervals,"1,2,2"); click(save);
+        QVERIFY(controller.messageIsError());
+        QVERIFY(current()->property("hasUnsavedChanges").toBool());
+        click(todayTab); QTRY_VERIFY(dialog->property("visible").toBool());
+        QTest::keyClick(window,Qt::Key_Escape);
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        type(intervals,"1, 3, 7"); click(save);
+        QCOMPARE(repo.settings().intervals,QVector<int>({1,3,7}));
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        // Refreshing saved settings updates a clean form; appearance auto-save
+        // and refresh must not erase other pending edits.
+        QVERIFY(controller.saveSettings(4,"1,4,8",false,true));
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        QCOMPARE(intervals->property("text").toString(),QString("1,4,8"));
+        type(intervals,"1,5,10");
+        QVERIFY(controller.setAppearance("Dark"));
+        QVERIFY(controller.refresh());
+        QCOMPARE(intervals->property("text").toString(),QString("1,5,10"));
+        QVERIFY(current()->property("hasUnsavedChanges").toBool());
+        // Discard really leaves and reloads saved values on return.
+        click(todayTab); QTRY_VERIFY(dialog->property("visible").toBool());
+        auto footer=dialog->property("footer").value<QObject *>(); QVERIFY(footer);
+        QQuickItem *discard=nullptr;
+        for (auto item : footer->findChildren<QQuickItem *>())
+            if (item->property("text").toString()=="Discard" && item->property("down").isValid()) discard=item;
+        QVERIFY(discard); click(discard);
+        QTRY_COMPARE(window->property("currentPage").toString(),QString("today"));
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        click(settingsTab);
+        QTRY_COMPARE(window->property("currentPage").toString(),QString("settings"));
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        QCOMPARE(current()->findChild<QObject *>("reviewIntervals")->property("text").toString(),QString("1,4,8"));
+        // Reverting a toggle or changing only the auto-saved theme is clean.
+        auto shuffle=current()->findChild<QQuickItem *>("shuffleReviews"); QVERIFY(shuffle);
+        auto jitter=current()->findChild<QQuickItem *>("jitterIntervals"); QVERIFY(jitter);
+        for (auto toggle : {shuffle,jitter}) {
+            click(toggle); QVERIFY(current()->property("hasUnsavedChanges").toBool());
+            click(toggle); QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        }
+        QVERIFY(controller.setAppearance("Light"));
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        // Closing the window uses the same guard and cancel keeps the draft.
+        intervals=current()->findChild<QQuickItem *>("reviewIntervals"); QVERIFY(intervals);
+        type(intervals,"1,6,12");
+        QVERIFY(!window->close());
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QTest::keyClick(window,Qt::Key_Escape);
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QVERIFY(window->isVisible());
+        QCOMPARE(intervals->property("text").toString(),QString("1,6,12"));
+        save=current()->findChild<QQuickItem *>("saveSettingsButton"); QVERIFY(save);
+        click(save);
+        QVERIFY(!current()->property("hasUnsavedChanges").toBool());
+        QVERIFY(window->close());
+        QVERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(warnings.count(),0);
+    }
     void detailScrolling() {
         QTemporaryDir dir; Database db(dir.filePath("scrolling.sqlite")); Repository repo(db);
         Problem a; a.title="Long solution"; a.url="https://leetcode.com/problems/long";

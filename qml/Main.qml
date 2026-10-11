@@ -21,7 +21,9 @@ ApplicationWindow {
         if (stack.currentItem && stack.currentItem.hasUnsavedChanges) { pendingAction = action; discardDialog.open() }
         else action()
     }
-    function navigate(page) { guarded(function() { showPage(page) }) }
+    function navigate(page) {
+        if (page !== currentPage) guarded(function() { showPage(page) })
+    }
     function showPage(page) {
         if (currentPage === "review") app.review.end()
         currentPage = page
@@ -40,9 +42,9 @@ ApplicationWindow {
             anchors.fill: parent
             anchors.leftMargin: 20; anchors.rightMargin: 20
             Label { textFormat: Text.PlainText; text: "LeetRepeat"; font.bold: true; font.pixelSize: 20; Layout.rightMargin: 24 }
-            ToolButton { text: "Today"; checked: window.currentPage === "today" || window.currentPage === "review"; onClicked: window.navigate("today") }
+            ToolButton { objectName: "todayTab"; text: "Today"; checked: window.currentPage === "today" || window.currentPage === "review"; onClicked: window.navigate("today") }
             ToolButton { text: "Problems"; checked: ["library", "detail", "import"].indexOf(window.currentPage) >= 0; onClicked: window.navigate("library") }
-            ToolButton { text: "Settings"; checked: window.currentPage === "settings"; onClicked: window.navigate("settings") }
+            ToolButton { objectName: "settingsTab"; text: "Settings"; checked: window.currentPage === "settings"; onClicked: window.navigate("settings") }
             Item { Layout.fillWidth: true }
             Label { textFormat: Text.PlainText; text: app.stats.remaining + " remaining today"; opacity: 0.7 }
         }
@@ -77,13 +79,20 @@ ApplicationWindow {
     Component { id: settingsPage; SettingsPage { onBackupRequested: backupDialog.open() } }
     Dialog {
         id: discardDialog
+        objectName: "discardEditsDialog"
         title: "Discard unsaved edits?"
         anchors.centerIn: parent
         width: 420
         modal: true
         standardButtons: Dialog.Discard | Dialog.Cancel
         Label { textFormat: Text.PlainText; width: parent.width; text: "Your edits have not been saved. Discard them to continue, or cancel and save first."; wrapMode: Text.Wrap }
-        onDiscarded: { var action = window.pendingAction; window.pendingAction = null; if (action) action() }
+        onDiscarded: {
+            var action = window.pendingAction
+            window.pendingAction = null
+            // Unlike Accept/Reject, Qt's Discard role does not close the dialog.
+            close()
+            if (action) action()
+        }
         onRejected: window.pendingAction = null
     }
     FileDialog { id: exportDialog; title: "Export problems"; fileMode: FileDialog.SaveFile; defaultSuffix: "csv"; nameFilters: ["CSV files (*.csv)"]; onAccepted: app.exportCsv(selectedFile) }
