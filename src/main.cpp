@@ -42,13 +42,14 @@ int main(int argc,char **argv) {
     parser.process(app);
     auto path=parser.value("database");
     if (path.isEmpty()) path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/leetrepeat.sqlite";
-    path=QFileInfo(path).absoluteFilePath();
-    if (!QDir().mkpath(QFileInfo(path).absolutePath()))
-        return startupFailure(app, "Cannot create data directory: " + QFileInfo(path).absolutePath(), parser.isSet("smoke-test"));
-    QLockFile lock(path+".lock");
-    if (!lock.tryLock())
-        return startupFailure(app, "The database is already in use, or its lock cannot be created: " + path, parser.isSet("smoke-test"));
     try {
+        path=lr::resolvedFilePath(path);
+        if (!QDir().mkpath(QFileInfo(path).absolutePath()))
+            return startupFailure(app, "Cannot create data directory: " + QFileInfo(path).absolutePath(), parser.isSet("smoke-test"));
+        path=lr::resolvedFilePath(path);
+        QLockFile lock(path+".lock");
+        if (!lock.tryLock())
+            return startupFailure(app, "The database is already in use, or its lock cannot be created: " + path, parser.isSet("smoke-test"));
         lr::Database database(path);
         lr::Repository repository(database);
         lr::AppController controller(repository);

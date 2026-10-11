@@ -84,12 +84,17 @@ bool AppController::commitImport() {
 bool AppController::exportCsv(const QUrl &url) { return run([&]{
     auto path=localPath(url);
     // Never let a file export replace the live database or one of its sidecars.
-    auto dbPath=QFileInfo(databasePath()).canonicalFilePath();
-    auto canonical=QFileInfo(path).canonicalFilePath();
-    auto absolute=QFileInfo(path).absoluteFilePath();
-    for (const auto &suffix : QStringList{"", "-wal", "-shm", ".lock"}) {
-        if ((!canonical.isEmpty() && canonical==dbPath+suffix) || absolute==dbPath+suffix)
-            throw std::runtime_error("Cannot export over the active database or its supporting files.");
+    if (databasePath()!=":memory:") {
+        const auto target=resolvedFilePath(path);
+#ifdef Q_OS_WIN
+        constexpr auto caseSensitivity=Qt::CaseInsensitive;
+#else
+        constexpr auto caseSensitivity=Qt::CaseSensitive;
+#endif
+        for (const auto &suffix : QStringList{"", "-wal", "-shm", ".lock"}) {
+            if (QString::compare(target,databasePath()+suffix,caseSensitivity)==0)
+                throw std::runtime_error("Cannot export over the active database or its supporting files.");
+        }
     }
     CsvService::exportProblems(path,m_repo.problems());
 },"CSV exported."); }

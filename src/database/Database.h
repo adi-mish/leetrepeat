@@ -3,6 +3,7 @@
 #include <QSqlQuery>
 #include <QVariantList>
 namespace lr {
+QString resolvedFilePath(const QString &path);
 QSqlQuery query(QSqlDatabase db, const QString &sql, const QVariantList &values = {});
 bool nextRow(QSqlQuery &query);
 class Transaction {

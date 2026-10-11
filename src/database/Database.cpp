@@ -6,6 +6,23 @@
 #include <stdexcept>
 namespace lr {
 static void error(const QString &message) { throw std::runtime_error(message.toStdString()); }
+QString resolvedFilePath(const QString &path) {
+    QFileInfo file(path);
+    QStringList links;
+    // Follow even a dangling file symlink, so a new database gets the same lock
+    // whether opened through the symlink or its target.
+    while (file.isSymbolicLink()) {
+        const auto link=file.absoluteFilePath();
+        if (links.contains(link)) error("Circular file symlink: " + path);
+        links.append(link);
+        file.setFile(file.symLinkTarget());
+    }
+    const auto canonical=file.canonicalFilePath();
+    if (!canonical.isEmpty()) return canonical;
+    // A new file has no canonical path yet; its existing parent can still be a symlink.
+    const auto parent=QFileInfo(file.absolutePath()).canonicalFilePath();
+    return QDir(parent.isEmpty() ? file.absolutePath() : parent).filePath(file.fileName());
+}
 QSqlQuery query(QSqlDatabase db, const QString &sql, const QVariantList &values) {
     QSqlQuery q(db);
     if (!q.prepare(sql)) error(q.lastError().text());
@@ -29,9 +46,13 @@ void Transaction::commit() {
     m_done = true;
 }
 Database::Database(const QString &path) : m_connectionName(QUuid::createUuid().toString()) {
-    if (path != ":memory:" && !QDir().mkpath(QFileInfo(path).absolutePath())) error("Cannot create database directory.");
+    auto resolved=path==":memory:" ? path : resolvedFilePath(path);
+    if (resolved != ":memory:") {
+        if (!QDir().mkpath(QFileInfo(resolved).absolutePath())) error("Cannot create database directory.");
+        resolved=resolvedFilePath(resolved);
+    }
     m_db = QSqlDatabase::addDatabase("QSQLITE", m_connectionName);
-    m_db.setDatabaseName(path);
+    m_db.setDatabaseName(resolved);
     m_db.setConnectOptions("QSQLITE_BUSY_TIMEOUT=5000");
     try {
         if (!m_db.open()) error(m_db.lastError().text());

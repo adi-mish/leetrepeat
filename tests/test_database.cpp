@@ -6,6 +6,33 @@ using namespace lr;
 class DatabaseTest : public QObject {
     Q_OBJECT
 private slots:
+    void symlinkDatabasePaths() {
+        QTemporaryDir dir; const auto real=dir.filePath("real.sqlite"), alias=dir.filePath("alias.sqlite");
+        { Database db(real); }
+        if (!QFile::link(real,alias) || !QFileInfo(alias).isSymbolicLink())
+            QSKIP("Filesystem symlinks are unavailable.");
+        qint64 id;
+        {
+            Database db(alias); Repository repo(db);
+            Problem p; p.title="Via alias"; p.url="https://leetcode.com/problems/alias";
+            id=repo.add(p);
+            QCOMPARE(db.path(),QFileInfo(real).canonicalFilePath());
+            QVERIFY(!QFileInfo::exists(alias+"-wal"));
+        }
+        { Database db(real); Repository repo(db); QCOMPARE(repo.problem(id).title,QString("Via alias")); }
+
+        const auto folder=dir.filePath("data"), folderAlias=dir.filePath("data-alias");
+        QVERIFY(QDir().mkpath(folder)); QVERIFY(QFile::link(folder,folderAlias));
+        {
+            Database db(folderAlias+"/new/nested.sqlite"); Repository repo(db);
+            QCOMPARE(db.path(),QFileInfo(folder+"/new/nested.sqlite").canonicalFilePath());
+            Problem p; p.title="New database"; p.url="https://leetcode.com/problems/new"; repo.add(p);
+        }
+        { Database db(folder+"/new/nested.sqlite"); Repository repo(db); QCOMPARE(repo.problems().size(),1); }
+        const auto target=folder+"/new/created.sqlite", dangling=dir.filePath("dangling.sqlite");
+        QVERIFY(QFile::link(target,dangling));
+        Database db(dangling); QCOMPARE(db.path(),QFileInfo(target).canonicalFilePath());
+    }
     void persistenceAndHistory() {
         QTemporaryDir dir; auto path=dir.filePath("test.sqlite");
         FixedIntervalScheduler scheduler;

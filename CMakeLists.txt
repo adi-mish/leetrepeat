@@ -57,7 +57,11 @@ if(BUILD_TESTING)
     endif()
     qt_add_executable(test_workflow tests/test_workflow.cpp)
     target_link_libraries(test_workflow PRIVATE leetrepeat_ui Qt6::Test)
-    target_compile_definitions(test_workflow PRIVATE QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(test_workflow PRIVATE
+        QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+        LEETREPEAT_BINARY_PATH="$<TARGET_FILE:leetrepeat>"
+    )
+    add_dependencies(test_workflow leetrepeat)
     add_test(NAME workflow COMMAND test_workflow)
     set_tests_properties(workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
 endif()

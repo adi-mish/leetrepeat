@@ -5,6 +5,9 @@
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QQuickStyle>
+#include <QLockFile>
+#include <QProcess>
+#include <QScopeGuard>
 #include <QSqlError>
 #include <QtEndian>
 #include "controllers/AppController.h"
@@ -335,6 +338,47 @@ private slots:
         QVERIFY(!app.exportCsv(QUrl::fromLocalFile(exported))); QVERIFY(app.messageIsError());
         QVERIFY(output.open(QIODevice::ReadOnly)); QCOMPARE(output.readAll(),before);
         QVERIFY(!app.review()->start()); QVERIFY(!app.review()->active());
+    }
+    void exportProtectsResolvedDatabaseAndSidecars() {
+        QTemporaryDir dir; const auto real=dir.filePath("real.sqlite"), alias=dir.filePath("alias.sqlite");
+        { Database db(real); }
+        if (!QFile::link(real,alias) || !QFileInfo(alias).isSymbolicLink())
+            QSKIP("Filesystem symlinks are unavailable.");
+        const auto folderAlias=dir.filePath("folder-alias"); QVERIFY(QFile::link(dir.path(),folderAlias));
+        Database db(alias); Repository repo(db); AppController app(repo);
+        QLockFile lock(db.path()+".lock"); QVERIFY(lock.tryLock());
+        for (const auto &suffix : QStringList{"", "-wal", "-shm", ".lock"}) {
+            QFile file(real+suffix); QVERIFY(file.open(QIODevice::ReadOnly));
+            const auto before=file.readAll(); file.close();
+            for (const auto &destination : QStringList{real+suffix,folderAlias+"/real.sqlite"+suffix}) {
+                QVERIFY(!app.exportCsv(QUrl::fromLocalFile(destination))); QVERIFY(app.messageIsError());
+                QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(),before); file.close();
+            }
+        }
+        QVERIFY(!app.exportCsv(QUrl::fromLocalFile(alias)));
+        const auto lockAlias=dir.filePath("lock-alias"); QVERIFY(QFile::link(db.path()+".lock",lockAlias));
+        QVERIFY(!app.exportCsv(QUrl::fromLocalFile(lockAlias)));
+        QVERIFY(app.exportCsv(QUrl::fromLocalFile(dir.filePath("normal.csv"))));
+    }
+    void databaseAliasesShareInstanceLock() {
+        QTemporaryDir dir; const auto real=dir.filePath("real.sqlite"), alias=dir.filePath("alias.sqlite");
+        { Database db(real); }
+        if (!QFile::link(real,alias) || !QFileInfo(alias).isSymbolicLink())
+            QSKIP("Filesystem symlinks are unavailable.");
+        auto environment=QProcessEnvironment::systemEnvironment();
+        environment.insert("QT_QPA_PLATFORM","offscreen"); environment.insert("QT_QUICK_BACKEND","software");
+        QProcess first; first.setProcessEnvironment(environment);
+        const auto cleanup=qScopeGuard([&]{ first.terminate(); first.waitForFinished(5000); });
+        first.start(QStringLiteral(LEETREPEAT_BINARY_PATH),{"--database",alias});
+        QVERIFY(first.waitForStarted(5000));
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(real+".lock"),5000);
+        QVERIFY(first.state()!=QProcess::NotRunning);
+        for (const auto &path : QStringList{real,alias}) {
+            QProcess second; second.setProcessEnvironment(environment);
+            second.start(QStringLiteral(LEETREPEAT_BINARY_PATH),{"--database",path,"--smoke-test"});
+            QVERIFY(second.waitForFinished(5000)); QCOMPARE(second.exitCode(),1);
+            QVERIFY(second.readAllStandardError().contains("database is already in use"));
+        }
     }
     void controllerFailuresAndRestart() {
         QTemporaryDir dir; auto path=dir.filePath("state.sqlite");
