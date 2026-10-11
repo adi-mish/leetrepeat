@@ -58,8 +58,10 @@ Page {
             spacing: 6
             ScrollBar.vertical: ScrollBar {}
             delegate: ItemDelegate {
+                id: problemRow
                 required property var problem
                 required property int index
+                property color labelColor: highlighted ? palette.highlightedText : palette.text
                 width: list.width
                 height: 94
                 highlighted: ListView.isCurrentItem
@@ -67,14 +69,15 @@ Page {
                 contentItem: ColumnLayout {
                     spacing: 4
                     RowLayout {
-                        Label { textFormat: Text.PlainText; text: problem.title; font.bold: true; font.pixelSize: 16; elide: Text.ElideRight; Layout.fillWidth: true }
-                        Label { textFormat: Text.PlainText; text: problem.difficulty; opacity: 0.8 }
+                        Label { textFormat: Text.PlainText; text: problem.title; color: problemRow.labelColor; font.bold: true; font.pixelSize: 16; elide: Text.ElideRight; Layout.fillWidth: true }
+                        Label { textFormat: Text.PlainText; text: problem.difficulty; color: problemRow.labelColor; opacity: 0.8 }
                     }
                     Label { textFormat: Text.PlainText;
+                        color: problemRow.labelColor
                         text: problem.learned ? "Learned  ·  Stage " + (problem.stage + 1) + "  ·  Next: " + problem.nextReview + "  ·  PASS " + problem.passes + "  /  FAIL " + problem.failures : "Not learned"
                         elide: Text.ElideRight; Layout.fillWidth: true; opacity: 0.8
                     }
-                    Label { textFormat: Text.PlainText; text: problem.tags.join(" · "); elide: Text.ElideRight; Layout.fillWidth: true; opacity: 0.6 }
+                    Label { textFormat: Text.PlainText; text: problem.tags.join(" · "); color: problemRow.labelColor; elide: Text.ElideRight; Layout.fillWidth: true; opacity: 0.6 }
                 }
                 Keys.onReturnPressed: page.editProblem(problem.id)
             }
