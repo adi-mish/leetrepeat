@@ -4,6 +4,7 @@
 #include <QVariantList>
 namespace lr {
 QSqlQuery query(QSqlDatabase db, const QString &sql, const QVariantList &values = {});
+bool nextRow(QSqlQuery &query);
 class Transaction {
 public:
     explicit Transaction(QSqlDatabase db);

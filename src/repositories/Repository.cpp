@@ -29,9 +29,9 @@ QList<Problem> Repository::problems() const {
     auto q = query(db, "SELECT * FROM problems WHERE deleted=0 ORDER BY id");
     QList<Problem> result;
     QHash<qint64, qsizetype> positions;
-    while (q.next()) { positions.insert(q.value("id").toLongLong(), result.size()); result.append(readProblem(q)); }
+    while (nextRow(q)) { positions.insert(q.value("id").toLongLong(), result.size()); result.append(readProblem(q)); }
     auto tags = query(db, "SELECT pt.problem_id,t.name FROM problem_tags pt JOIN tags t ON t.id=pt.tag_id ORDER BY t.name_key");
-    while (tags.next()) {
+    while (nextRow(tags)) {
         auto it = positions.constFind(tags.value(0).toLongLong());
         if (it != positions.cend()) result[*it].tags.append(tags.value(1).toString());
     }
@@ -40,10 +40,10 @@ QList<Problem> Repository::problems() const {
 Problem Repository::problem(qint64 id) const {
     auto db = m_database.connection();
     auto q = query(db, "SELECT * FROM problems WHERE id=? AND deleted=0", {id});
-    if (!q.next()) throw std::runtime_error("Problem no longer exists.");
+    if (!nextRow(q)) throw std::runtime_error("Problem no longer exists.");
     auto p = readProblem(q);
     auto tags = query(db, "SELECT t.name FROM tags t JOIN problem_tags pt ON pt.tag_id=t.id WHERE pt.problem_id=? ORDER BY t.name_key", {id});
-    while (tags.next()) p.tags.append(tags.value(0).toString());
+    while (nextRow(tags)) p.tags.append(tags.value(0).toString());
     return p;
 }
 void Repository::writeTags(const Problem &p) {
@@ -58,7 +58,7 @@ void Repository::validateUnique(const Problem &p) const {
     auto q = query(m_database.connection(),
                    "SELECT title FROM problems WHERE deleted=0 AND id<>? AND (title_key=? OR url_key=?) LIMIT 1",
                    {p.id, normalizedTitle(p.title), normalizedUrl(p.url)});
-    if (q.next())
+    if (nextRow(q))
         throw std::runtime_error(QString("A problem with this title or URL already exists: %1").arg(q.value(0).toString()).toStdString());
 }
 qint64 Repository::insert(Problem p) {
@@ -126,7 +126,7 @@ void Repository::review(qint64 id, bool passed, const IScheduler &scheduler, QDa
 QVariantList Repository::history(qint64 id) const {
     auto q = query(m_database.connection(), "SELECT * FROM attempts WHERE problem_id=? ORDER BY id DESC", {id});
     QVariantList rows;
-    while (q.next()) {
+    while (nextRow(q)) {
         QVariantMap row;
         for (int i=0; i<q.record().count(); ++i) row.insert(q.record().fieldName(i), q.value(i));
         rows.append(row);
@@ -135,14 +135,14 @@ QVariantList Repository::history(qint64 id) const {
 }
 int Repository::learnedOn(QDate date) const {
     auto q = query(m_database.connection(), "SELECT COUNT(*) FROM learning_events WHERE local_date=?", {date.toString(Qt::ISODate)});
-    q.next(); return q.value(0).toInt();
+    nextRow(q); return q.value(0).toInt();
 }
 QVariantMap Repository::stats(QDate date) const {
     int learned=0, due=0, overdue=0;
     auto all = problems();
     for (const auto &p : all) { learned += p.learned; due += p.isDue(date); overdue += p.isDue(date) && p.nextReview < date; }
     auto q = query(m_database.connection(), "SELECT COALESCE(SUM(result='PASS'),0),COALESCE(SUM(result='FAIL'),0) FROM attempts WHERE local_date=?", {date.toString(Qt::ISODate)});
-    q.next(); int passes=q.value(0).toInt(), failures=q.value(1).toInt();
+    nextRow(q); int passes=q.value(0).toInt(), failures=q.value(1).toInt();
     int learnedToday = learnedOn(date);
     int unseen = int(all.size()) - learned;
     int newCount = std::min(unseen, std::max(0, settings().newPerDay - learnedToday));
@@ -153,7 +153,7 @@ QVariantMap Repository::stats(QDate date) const {
 Settings Repository::settings() const {
     Settings s;
     auto q = query(m_database.connection(), "SELECT key,value FROM settings");
-    while (q.next()) {
+    while (nextRow(q)) {
         auto key=q.value(0).toString(), value=q.value(1).toString();
         if (key=="appearance") s.appearance=value;
         if (key=="newPerDay") s.newPerDay=value.toInt();

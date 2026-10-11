@@ -13,6 +13,12 @@ QSqlQuery query(QSqlDatabase db, const QString &sql, const QVariantList &values)
     if (!q.exec()) error(q.lastError().text());
     return q;
 }
+bool nextRow(QSqlQuery &q) {
+    if (q.next()) return true;
+    // SQLite can fail after exec() succeeds, while fetching a later row.
+    if (q.lastError().isValid()) error(q.lastError().text());
+    return false;
+}
 Transaction::Transaction(QSqlDatabase db) : m_db(db) {
     // Take the write lock before reading state, preventing stale read-modify-write updates.
     query(m_db, "BEGIN IMMEDIATE");
@@ -42,7 +48,7 @@ void Database::migrate() {
     Transaction tx(m_db);
     query(m_db, "CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL)");
     auto q = query(m_db, "SELECT version FROM schema_version");
-    int version = q.next() ? q.value(0).toInt() : 0;
+    int version = nextRow(q) ? q.value(0).toInt() : 0;
     q.finish();
     if (version > 1) error("This database was created by a newer version of LeetRepeat.");
     if (version == 0) {

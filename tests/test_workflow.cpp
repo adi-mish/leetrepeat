@@ -5,6 +5,8 @@
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QQuickStyle>
+#include <QSqlError>
+#include <QtEndian>
 #include "controllers/AppController.h"
 #include "scheduling/FixedIntervalScheduler.h"
 using namespace lr;
@@ -284,6 +286,55 @@ private slots:
         QCOMPARE(app.stats()["newCount"].toInt(),2); QVERIFY(!app.commitImport());
         auto exported=dir.filePath("export.csv"); QVERIFY(app.exportCsv(QUrl::fromLocalFile(exported)));
         QCOMPARE(CsvService::preview(exported,{}).ready.size(),2);
+    }
+    void lateReadFailurePreservesExportAndCachedLibrary() {
+        QTemporaryDir dir; const auto path=dir.filePath("read-error.sqlite");
+        Database db(path); Repository repo(db);
+        QList<Problem> corpus;
+        for (int i=0; i<200; ++i) {
+            Problem p; p.title=QString("Read problem %1").arg(i);
+            p.url=QString("https://leetcode.com/problems/read-%1").arg(i);
+            p.notes=QString(1800,'x'); corpus.append(p);
+        }
+        QCOMPARE(repo.importProblems(corpus),200);
+        AppController app(repo);
+        const auto exported=dir.filePath("export.csv");
+        QVERIFY(app.exportCsv(QUrl::fromLocalFile(exported)));
+        QFile output(exported); QVERIFY(output.open(QIODevice::ReadOnly));
+        const auto before=output.readAll(); output.close();
+
+        int pageSize, rootPage;
+        {
+            auto size=query(db.connection(),"PRAGMA page_size"); QVERIFY(size.next()); pageSize=size.value(0).toInt();
+            auto root=query(db.connection(),"SELECT rootpage FROM sqlite_master WHERE name='problems'");
+            QVERIFY(root.next()); rootPage=root.value(0).toInt();
+        }
+        // Damage a middle table leaf in this disposable database. Earlier rows
+        // remain readable, so exec() succeeds and the error occurs during next().
+        auto connection=db.connection(); connection.close();
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadWrite));
+        QVERIFY(file.seek(qint64(rootPage-1)*pageSize));
+        const auto root=file.read(pageSize); QCOMPARE(root.size(),pageSize);
+        QCOMPARE(quint8(root[0]),quint8(0x05)); // Interior table page, not page 1.
+        const auto cells=qFromBigEndian<quint16>(root.constData()+3); QVERIFY(cells>2);
+        const auto cell=qFromBigEndian<quint16>(root.constData()+12+2*(cells/2));
+        QVERIFY(cell+4<=root.size());
+        const auto leaf=qFromBigEndian<quint32>(root.constData()+cell);
+        const auto offset=qint64(leaf-1)*pageSize;
+        QVERIFY(file.seek(offset)); QCOMPARE(file.read(1),QByteArray(1,char(0x0d)));
+        QVERIFY(file.seek(offset)); QCOMPARE(file.write(QByteArray(1,'\0')),qint64(1)); file.close();
+        QVERIFY(connection.open());
+        {
+            auto raw=query(connection,"SELECT * FROM problems WHERE deleted=0 ORDER BY id");
+            int rows=0; while (raw.next()) ++rows; // Deliberately inspect the driver's late error.
+            QVERIFY(rows>0 && rows<200); QVERIFY(raw.lastError().isValid());
+        }
+        QVERIFY_EXCEPTION_THROWN(repo.problems(),std::runtime_error);
+        QVERIFY(!app.refresh()); QVERIFY(app.messageIsError());
+        QCOMPARE(app.problems()->rowCount(),200); QCOMPARE(app.stats()["total"].toInt(),200);
+        QVERIFY(!app.exportCsv(QUrl::fromLocalFile(exported))); QVERIFY(app.messageIsError());
+        QVERIFY(output.open(QIODevice::ReadOnly)); QCOMPARE(output.readAll(),before);
+        QVERIFY(!app.review()->start()); QVERIFY(!app.review()->active());
     }
     void controllerFailuresAndRestart() {
         QTemporaryDir dir; auto path=dir.filePath("state.sqlite");
