@@ -274,6 +274,92 @@ private slots:
         QTRY_VERIFY(gutterClear());
         QCOMPARE(warnings.count(),0);
     }
+    void gradingDoubleClick_data() {
+        QTest::addColumn<bool>("passed");
+        QTest::newRow("PASS") << true;
+        QTest::newRow("FAIL") << false;
+    }
+    void gradingDoubleClick() {
+        QFETCH(bool,passed);
+        QTemporaryDir dir; Database db(dir.filePath("double-click.sqlite")); Repository repo(db);
+        Problem a; a.title="First"; a.url="https://leetcode.com/problems/first"; const auto first=repo.add(a);
+        Problem b; b.title="Second"; b.url="https://leetcode.com/problems/second"; const auto second=repo.add(b);
+        Settings settings; settings.shuffle=false; repo.saveSettings(settings); FixedIntervalScheduler scheduler;
+        const auto learned=QDateTime::currentDateTime().addDays(-2);
+        repo.learn(first,scheduler,learned,3); repo.learn(second,scheduler,learned,3);
+        AppController app(repo); QQmlApplicationEngine engine; QSignalSpy warnings(&engine,&QQmlEngine::warnings);
+        engine.rootContext()->setContextProperty("app",&app);
+        engine.load(QUrl::fromLocalFile(QStringLiteral(QML_SOURCE_DIR "/qml/Main.qml")));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window=qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        QVERIFY(app.review()->start());
+        QVERIFY(QMetaObject::invokeMethod(window,"showPage",Q_ARG(QVariant,QString("review"))));
+        auto button=window->findChild<QQuickItem *>(passed ? "passButton" : "failButton"); QVERIFY(button);
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,
+                          button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint(),50);
+        QCOMPARE(repo.history(first).size(),1); QCOMPARE(repo.history(second).size(),0);
+        QCOMPARE(repo.history(first).first().toMap()["result"].toString(),QString(passed ? "PASS" : "FAIL"));
+        QCOMPARE(app.review()->current()["id"].toLongLong(),second); QCOMPARE(app.review()->completed(),1);
+        // A deliberate keyboard grade immediately afterwards still advances.
+        QTest::keyClick(window,passed ? Qt::Key_F : Qt::Key_P);
+        QTRY_COMPARE(repo.history(second).size(),1); QVERIFY(!app.review()->active());
+        QCOMPARE(warnings.count(),0);
+    }
+    void learningDoubleClick() {
+        QTemporaryDir dir; Database db(dir.filePath("learning-click.sqlite")); Repository repo(db);
+        Problem a; a.title="First"; a.url="https://leetcode.com/problems/first"; const auto first=repo.add(a);
+        Problem b; b.title="Second"; b.url="https://leetcode.com/problems/second"; const auto second=repo.add(b);
+        AppController app(repo); QQmlApplicationEngine engine; QSignalSpy warnings(&engine,&QQmlEngine::warnings);
+        engine.rootContext()->setContextProperty("app",&app);
+        engine.load(QUrl::fromLocalFile(QStringLiteral(QML_SOURCE_DIR "/qml/Main.qml")));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window=qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        QVERIFY(app.review()->start());
+        QVERIFY(QMetaObject::invokeMethod(window,"showPage",Q_ARG(QVariant,QString("review"))));
+        auto notes=window->findChild<QQuickItem *>("studyNotes"); QVERIFY(notes); notes->setProperty("text","Studied the first card");
+        auto button=window->findChild<QQuickItem *>("markLearnedButton"); QVERIFY(button);
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,
+                          button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint(),50);
+        QVERIFY(repo.problem(first).learned); QVERIFY(!repo.problem(second).learned);
+        QCOMPARE(repo.learnedOn(QDate::currentDate()),1); QCOMPARE(repo.problem(first).notes,QString("Studied the first card"));
+        QCOMPARE(app.review()->current()["id"].toLongLong(),second); QCOMPARE(app.review()->completed(),1);
+        QCOMPARE(repo.history(first).size(),0); QCOMPARE(warnings.count(),0);
+    }
+    void studyScrolling() {
+        QTemporaryDir dir; Database db(dir.filePath("study-scroll.sqlite")); Repository repo(db);
+        Problem a; a.title="First"; a.url="https://leetcode.com/problems/first";
+        a.notes=QString("Remember the invariant.\n").repeated(100); const auto first=repo.add(a);
+        Problem b=a; b.title="Second"; b.url="https://leetcode.com/problems/second"; const auto second=repo.add(b);
+        AppController app(repo); QQmlApplicationEngine engine; QSignalSpy warnings(&engine,&QQmlEngine::warnings);
+        engine.rootContext()->setContextProperty("app",&app);
+        engine.load(QUrl::fromLocalFile(QStringLiteral(QML_SOURCE_DIR "/qml/Main.qml")));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto window=qobject_cast<QQuickWindow *>(engine.rootObjects().first()); QVERIFY(window);
+        window->resize(800,640); window->requestActivate(); QVERIFY(QTest::qWaitForWindowActive(window));
+        QVERIFY(app.review()->start());
+        QVERIFY(QMetaObject::invokeMethod(window,"showPage",Q_ARG(QVariant,QString("review"))));
+        auto scroll=window->findChild<QQuickItem *>("studyScroll"); QVERIFY(scroll);
+        auto viewport=scroll->property("contentItem").value<QQuickItem *>(); QVERIFY(viewport);
+        auto notes=window->findChild<QQuickItem *>("studyNotes"); QVERIFY(notes);
+        auto solution=window->findChild<QQuickItem *>("studySolution"); QVERIFY(solution);
+        QTRY_VERIFY(scroll->property("contentHeight").toReal()>scroll->height()*2);
+        QTRY_COMPARE(viewport->property("contentY").toReal(),0.0);
+        notes->setProperty("text",a.notes+"Saved note");
+        viewport->setProperty("contentY",500); QTest::qWait(50);
+        // Saving the same card preserves reading position.
+        QVERIFY(app.review()->saveStudy(notes->property("text").toString(),solution->property("text").toString()));
+        QTest::qWait(50); QCOMPARE(viewport->property("contentY").toReal(),500.0);
+        QCOMPARE(app.review()->current()["id"].toLongLong(),first);
+        auto button=window->findChild<QQuickItem *>("markLearnedButton"); QVERIFY(button);
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,
+                         button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());
+        QCOMPARE(app.review()->current()["id"].toLongLong(),second);
+        QTRY_COMPARE(viewport->property("contentY").toReal(),0.0);
+        QTest::qWait(50); QCOMPARE(viewport->property("contentY").toReal(),0.0);
+        QCOMPARE(notes->property("text").toString(),b.notes); QCOMPARE(warnings.count(),0);
+    }
     void importPreviewAndCommit() {
         QTemporaryDir dir; Database db(dir.filePath("imports.sqlite")); Repository repo(db); AppController app(repo);
         auto path=dir.filePath("input.csv");
