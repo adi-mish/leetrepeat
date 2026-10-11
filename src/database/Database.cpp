@@ -71,7 +71,7 @@ void Database::migrate() {
     auto q = query(m_db, "SELECT version FROM schema_version");
     int version = nextRow(q) ? q.value(0).toInt() : 0;
     q.finish();
-    if (version > 1) error("This database was created by a newer version of LeetRepeat.");
+    if (version > 2) error("This database was created by a newer version of LeetRepeat.");
     if (version == 0) {
         const QStringList statements{
             "CREATE TABLE problems(id INTEGER PRIMARY KEY, title TEXT NOT NULL, title_key TEXT NOT NULL, url TEXT NOT NULL, url_key TEXT NOT NULL, difficulty TEXT NOT NULL CHECK(difficulty IN ('Easy','Medium','Hard','Unknown')), notes TEXT NOT NULL DEFAULT '', solution TEXT NOT NULL DEFAULT '', learned INTEGER NOT NULL DEFAULT 0 CHECK(learned IN (0,1)), first_learned TEXT, last_review TEXT, next_review TEXT, scheduler_state TEXT NOT NULL DEFAULT '{}', passes INTEGER NOT NULL DEFAULT 0, failures INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)",
@@ -92,6 +92,13 @@ void Database::migrate() {
             "INSERT INTO schema_version VALUES(1)"
         };
         for (const auto &sql : statements) query(m_db, sql);
+    }
+    if (version < 2) {
+        // Existing databases retain their order and all saved data until explicitly shuffled.
+        query(m_db, "ALTER TABLE problems ADD COLUMN study_order INTEGER NOT NULL DEFAULT 0");
+        query(m_db, "UPDATE problems SET study_order=id");
+        query(m_db, "CREATE INDEX problems_study_order ON problems(study_order,id)");
+        query(m_db, "UPDATE schema_version SET version=2");
     }
     tx.commit();
 }

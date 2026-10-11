@@ -2,10 +2,128 @@
 #include <QTemporaryDir>
 #include "repositories/Repository.h"
 #include "scheduling/FixedIntervalScheduler.h"
+#include "services/DailyQueue.h"
 using namespace lr;
 class DatabaseTest : public QObject {
     Q_OBJECT
 private slots:
+    void shuffledIntakePersistsAcrossPartialDaysAndImports() {
+        QTemporaryDir dir; const auto path=dir.filePath("mixed.sqlite");
+        const QDateTime today(QDate(2026,10,11),QTime(12,0));
+        Settings settings; settings.newPerDay=4; settings.shuffle=false;
+        FixedIntervalScheduler scheduler;
+        QList<qint64> savedOrder, firstDay;
+        {
+            Database db(path); Repository repo(db); repo.saveSettings(settings);
+            QList<Problem> corpus;
+            for (const auto &difficulty : QStringList{"Easy","Medium","Hard"}) {
+                const int count=difficulty=="Medium" ? 6 : 3;
+                for (int i=0; i<count; ++i) {
+                    Problem p; p.title=QString("%1 %2").arg(difficulty).arg(i);
+                    p.url=QString("https://leetcode.com/problems/%1-%2").arg(difficulty.toLower()).arg(i);
+                    p.difficulty=" "+difficulty.toLower()+" ";
+                    p.notes="Saved notes"; p.solution="Saved solution"; p.tags={"Saved tag"};
+                    p.learned=true; // A corpus import must ignore supplied progress.
+                    corpus.append(p);
+                }
+            }
+            QCOMPARE(repo.importProblems(corpus),12);
+            for (const auto &p : repo.problems()) { savedOrder.append(p.id); QVERIFY(!p.learned); }
+            firstDay=DailyQueue::build(repo.problems(),today.date(),settings,0).fresh;
+            QStringList mix;
+            for (auto id : firstDay) mix.append(repo.problem(id).difficulty);
+            mix.sort(); QCOMPARE(mix,QStringList({"Easy","Hard","Medium","Medium"}));
+            repo.learn(firstDay[0],scheduler,today,4);
+            QCOMPARE(DailyQueue::build(repo.problems(),today.date(),settings,repo.learnedOn(today.date())).fresh,firstDay.mid(1));
+        }
+        Database db(path); Repository repo(db);
+        QList<qint64> reopened;
+        for (const auto &p : repo.problems()) {
+            reopened.append(p.id); QCOMPARE(p.notes,QString("Saved notes"));
+            QCOMPARE(p.solution,QString("Saved solution")); QCOMPARE(p.tags,QStringList{"Saved tag"});
+        }
+        QCOMPARE(reopened,savedOrder);
+        QCOMPARE(DailyQueue::build(repo.problems(),today.date(),repo.settings(),repo.learnedOn(today.date())).fresh,firstDay.mid(1));
+        for (auto id : firstDay.mid(1)) repo.learn(id,scheduler,today,4);
+        QVERIFY(DailyQueue::build(repo.problems(),today.date(),repo.settings(),repo.learnedOn(today.date())).fresh.isEmpty());
+        auto tomorrow=DailyQueue::build(repo.problems(),today.date().addDays(1),repo.settings(),0);
+        QCOMPARE(tomorrow.reviews,firstDay); QCOMPARE(tomorrow.fresh,savedOrder.mid(4,4));
+        QStringList mix;
+        for (auto id : tomorrow.fresh) mix.append(repo.problem(id).difficulty);
+        mix.sort(); QCOMPARE(mix,QStringList({"Easy","Hard","Medium","Medium"}));
+        Problem extra; extra.title="Later"; extra.url="https://leetcode.com/problems/later";
+        repo.add(extra);
+        QList<Problem> later;
+        for (int i=0; i<4; ++i) {
+            Problem p; p.title=QString("Imported later %1").arg(i);
+            p.url=QString("https://leetcode.com/problems/later-%1").arg(i);
+            p.difficulty=QStringList{"Easy","Medium","Medium","Hard"}[i]; later.append(p);
+        }
+        QCOMPARE(repo.importProblems(later),4);
+        QList<qint64> extended;
+        for (const auto &p : repo.problems()) extended.append(p.id);
+        QCOMPARE(extended.mid(0,12),savedOrder);
+        QCOMPARE(DailyQueue::build(repo.problems(),today.date().addDays(1),repo.settings(),0).fresh,tomorrow.fresh);
+    }
+    void importOrderingFailureRollsBackEntireBatch() {
+        Database db(":memory:"); Repository repo(db);
+        Problem saved; saved.title="Saved"; saved.url="https://leetcode.com/problems/saved";
+        saved.notes="Keep me"; saved.tags={"Original"}; const auto id=repo.add(saved);
+        const auto before=repo.problem(id).toVariant();
+        query(db.connection(),"CREATE TRIGGER fail_order BEFORE UPDATE OF study_order ON problems WHEN NEW.title='Incoming 3' BEGIN SELECT RAISE(ABORT,'injected order failure'); END");
+        QList<Problem> batch;
+        for (int i=0; i<4; ++i) {
+            Problem p; p.title=QString("Incoming %1").arg(i);
+            p.url=QString("https://leetcode.com/problems/incoming-%1").arg(i);
+            p.difficulty=QStringList{"Easy","Medium","Medium","Hard"}[i]; p.tags={"Transient"}; batch.append(p);
+        }
+        QVERIFY_EXCEPTION_THROWN(repo.importProblems(batch),std::runtime_error);
+        QCOMPARE(repo.problems().size(),1); QCOMPARE(repo.problem(id).toVariant(),before);
+        auto tags=query(db.connection(),"SELECT COUNT(*) FROM tags"); QVERIFY(nextRow(tags)); QCOMPARE(tags.value(0).toInt(),1);
+        auto order=query(db.connection(),"SELECT study_order FROM problems WHERE id=?",{id});
+        QVERIFY(nextRow(order)); QCOMPARE(order.value(0).toLongLong(),qint64(1));
+    }
+    void v1MigrationPreservesDataAndRollsBackFailure() {
+        QTemporaryDir dir; const auto path=dir.filePath("migration.sqlite");
+        const QDateTime first(QDate(2026,9,1),QTime(12,0));
+        FixedIntervalScheduler scheduler; qint64 learned, unseen, deleted;
+        QVariantMap before; QVariantList history; Settings settings;
+        settings.newPerDay=4; settings.appearance="Dark"; settings.intervals={1,3,9};
+        {
+            Database db(path); Repository repo(db);
+            Problem p; p.title="Learned"; p.url="https://leetcode.com/problems/learned";
+            p.notes="Preserve notes"; p.solution="Preserve solution"; p.tags={"Arrays","Custom"};
+            learned=repo.add(p); repo.learn(learned,scheduler,first,4); repo.review(learned,false,scheduler,first.addDays(1));
+            p.title="Deleted"; p.url="https://leetcode.com/problems/deleted"; deleted=repo.add(p); repo.remove(deleted);
+            p.title="Unseen"; p.url="https://leetcode.com/problems/unseen"; unseen=repo.add(p);
+            repo.saveSettings(settings); before=repo.problem(learned).toVariant(); history=repo.history(learned);
+            // Remove only the v2 additions to recreate the deployed v1 schema.
+            query(db.connection(),"DROP INDEX problems_study_order");
+            query(db.connection(),"ALTER TABLE problems DROP COLUMN study_order");
+            query(db.connection(),"UPDATE schema_version SET version=1");
+            query(db.connection(),"CREATE TRIGGER fail_migration BEFORE UPDATE ON schema_version BEGIN SELECT RAISE(ABORT,'injected migration failure'); END");
+            QVERIFY_EXCEPTION_THROWN(Database{path},std::runtime_error);
+            auto version=query(db.connection(),"SELECT version FROM schema_version");
+            QVERIFY(nextRow(version)); QCOMPARE(version.value(0).toInt(),1); version.finish();
+            auto columns=query(db.connection(),"SELECT name FROM pragma_table_info('problems') WHERE name='study_order'");
+            QVERIFY(!nextRow(columns));
+            QCOMPARE(repo.problem(learned).toVariant(),before); QCOMPARE(repo.history(learned),history);
+            query(db.connection(),"DROP TRIGGER fail_migration");
+        }
+        {
+            Database db(path); Repository repo(db);
+            QCOMPARE(repo.problems().size(),2); QCOMPARE(repo.problems()[0].id,learned); QCOMPARE(repo.problems()[1].id,unseen);
+            QCOMPARE(repo.problem(learned).toVariant(),before); QCOMPARE(repo.history(learned),history);
+            QCOMPARE(repo.learnedOn(first.date()),1); QCOMPARE(repo.settings().newPerDay,4);
+            QCOMPARE(repo.settings().appearance,settings.appearance); QCOMPARE(repo.settings().intervals,settings.intervals);
+            auto tombstone=query(db.connection(),"SELECT deleted FROM problems WHERE id=?",{deleted});
+            QVERIFY(nextRow(tombstone)); QCOMPARE(tombstone.value(0).toInt(),1);
+            auto version=query(db.connection(),"SELECT version FROM schema_version"); QVERIFY(nextRow(version)); QCOMPARE(version.value(0).toInt(),2);
+            QVERIFY_EXCEPTION_THROWN(query(db.connection(),"DELETE FROM attempts"),std::runtime_error);
+            query(db.connection(),"UPDATE schema_version SET version=3");
+        }
+        QVERIFY_EXCEPTION_THROWN(Database{path},std::runtime_error);
+    }
     void symlinkDatabasePaths() {
         QTemporaryDir dir; const auto real=dir.filePath("real.sqlite"), alias=dir.filePath("alias.sqlite");
         { Database db(real); }

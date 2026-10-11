@@ -4,6 +4,32 @@ using namespace lr;
 class QueueTest : public QObject {
     Q_OBJECT
 private slots:
+    void mixedNewProblemsAndExhaustedDifficulties() {
+        QList<Problem> problems;
+        QHash<qint64,QString> difficulties;
+        const QStringList input{"Easy","Easy","Easy","Medium","Medium","Medium","Medium","Medium","Medium","Hard","Hard","Unknown"};
+        QSet<qint64> expected;
+        for (const auto &difficulty : input) {
+            Problem p; p.id=problems.size()+1; p.difficulty=difficulty;
+            problems.append(p); difficulties.insert(p.id,difficulty); expected.insert(p.id);
+        }
+        Problem learned; learned.id=100; learned.difficulty="Easy"; learned.learned=true;
+        problems.append(learned);
+        auto order=DailyQueue::shuffledNewOrder(problems);
+        QCOMPARE(order.size(),expected.size());
+        QCOMPARE(QSet<qint64>(order.cbegin(),order.cend()),expected);
+        for (int day=0; day<2; ++day) {
+            QStringList mix;
+            for (int i=day*4; i<day*4+4; ++i) mix.append(difficulties[order[i]]);
+            mix.sort(); QCOMPARE(mix,QStringList({"Easy","Hard","Medium","Medium"}));
+        }
+        // Exhausting Hard must still allow every remaining problem to be learned.
+        QStringList remainder;
+        for (int i=8; i<order.size(); ++i) remainder.append(difficulties[order[i]]);
+        remainder.sort(); QCOMPARE(remainder,QStringList({"Easy","Medium","Medium","Unknown"}));
+        QCOMPARE(difficulties[order.last()],QString("Unknown"));
+        QVERIFY(DailyQueue::shuffledNewOrder({learned}).isEmpty());
+    }
     void dailyCountsAndSkippedDays() {
         Settings s; s.shuffle=false;
         QDate today(2026,9,22);

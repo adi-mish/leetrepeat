@@ -1,5 +1,6 @@
 #include "Repository.h"
 #include "scheduling/FixedIntervalScheduler.h"
+#include "services/DailyQueue.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSqlRecord>
@@ -26,7 +27,7 @@ static Problem readProblem(const QSqlQuery &q) {
 }
 QList<Problem> Repository::problems() const {
     auto db = m_database.connection();
-    auto q = query(db, "SELECT * FROM problems WHERE deleted=0 ORDER BY id");
+    auto q = query(db, "SELECT * FROM problems WHERE deleted=0 ORDER BY study_order,id");
     QList<Problem> result;
     QHash<qint64, qsizetype> positions;
     while (nextRow(q)) { positions.insert(q.value("id").toLongLong(), result.size()); result.append(readProblem(q)); }
@@ -61,12 +62,12 @@ void Repository::validateUnique(const Problem &p) const {
     if (nextRow(q))
         throw std::runtime_error(QString("A problem with this title or URL already exists: %1").arg(q.value(0).toString()).toStdString());
 }
-qint64 Repository::insert(Problem p) {
+qint64 Repository::insert(Problem &p) {
     validateProblem(p);
     p.id = 0;
     validateUnique(p);
     auto now = stamp(QDateTime::currentDateTime());
-    auto q = query(m_database.connection(), "INSERT INTO problems(title,title_key,url,url_key,difficulty,notes,solution,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+    auto q = query(m_database.connection(), "INSERT INTO problems(title,title_key,url,url_key,difficulty,notes,solution,created_at,updated_at,study_order) VALUES(?,?,?,?,?,?,?,?,?,(SELECT COALESCE(MAX(study_order),0)+1 FROM problems))",
                    {p.title, normalizedTitle(p.title), p.url, normalizedUrl(p.url), p.difficulty, text(p.notes), text(p.solution), now, now});
     p.id = q.lastInsertId().toLongLong();
     writeTags(p);
@@ -77,8 +78,19 @@ qint64 Repository::add(Problem p) {
     auto id = insert(p); tx.commit(); return id;
 }
 int Repository::importProblems(const QList<Problem> &problems) {
-    Transaction tx(m_database.connection());
-    for (const auto &p : problems) insert(p);
+    const auto db=m_database.connection();
+    Transaction tx(db);
+    auto last=query(db, "SELECT COALESCE(MAX(study_order),0) FROM problems");
+    nextRow(last); qint64 rank=last.value(0).toLongLong(); last.finish();
+    QList<Problem> imported;
+    for (auto p : problems) {
+        insert(p);
+        p.learned=false; // Import only corpus metadata, regardless of supplied progress.
+        imported.append(p);
+    }
+    // Append the shuffled batch without changing the existing study queue.
+    for (auto id : DailyQueue::shuffledNewOrder(imported))
+        query(db, "UPDATE problems SET study_order=? WHERE id=?", {++rank,id});
     tx.commit(); return int(problems.size());
 }
 void Repository::edit(Problem p) {

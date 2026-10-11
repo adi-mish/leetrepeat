@@ -6,6 +6,6 @@
 
 The snapshot excludes all **7** entries whose LeetCode `paid_only` flag was `true`. Every one of the 250 list entries matched a LeetCode slug; there were no unresolved entries. Availability can change after this snapshot; see [neetcode250-free.sources.json](neetcode250-free.sources.json) for retrieval time, source URLs, hashes, counts, and the exact excluded titles.
 
-Titles and difficulties come from LeetCode. Each row has the `NeetCode 250` tag and its original NeetCode category. Rows retain NeetCode's list order. Notes and solutions are left blank.
+Titles and difficulties come from LeetCode. Each row has the `NeetCode 250` tag and its original NeetCode category. CSV rows retain NeetCode's list order; the app saves a shuffled study order balancing 1 Easy, 2 Medium, and 1 Hard while available. Notes and solutions are left blank.
 
 Import through **Problems → Import CSV**. Existing title/URL matches are shown as duplicates and skipped; existing notes and progress are preserved. New rows begin unlearned. This is a data snapshot, not a network feature in the application.

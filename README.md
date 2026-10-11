@@ -39,7 +39,7 @@ On WSL, problem links open Windows Chrome when `chrome.exe` is on `PATH` or inst
 
 1. Open **Problems**, then **Import CSV** or **Add problem**.
 2. **Today** shows new problems, all reviews due on or before today, and the remaining total.
-3. **Start Session** presents due reviews first, then the day's new problems. Reviews shuffle by default; unseen problems follow import/add order.
+3. **Start Session** presents due reviews first, then the day's new problems. Reviews shuffle by default. Each imported batch gets a saved shuffled order that repeats **1 Easy, 2 Medium, 1 Hard** while all three difficulties are available; exhausted difficulties are skipped, and Unknown problems follow the rated problems. Resuming a partial day or restarting keeps the same unseen order. Later imports append a new shuffled batch, and manual additions append a single problem.
 4. For a new problem, open its URL, study externally, and optionally write notes and a canonical solution. **Mark Learned** saves the notes and schedules tomorrow's first review. Initial learning is not a PASS attempt.
 5. For a review, reproduce the solution cold. Reveal notes if needed, then choose PASS or FAIL. Each result is saved immediately before advancing.
 
@@ -142,7 +142,7 @@ QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
 - `qml`: presentation, navigation, dialogs, and keyboard interactions. No SQL or scheduling rules.
 - `tests`: headless core tests and the desktop workflow test.
 
-Schema v1 contains `problems`, `attempts`, `settings`, `schema_version`, normalized `tags` / `problem_tags`, and a small `learning_events` table for durable daily intake accounting. Future migrations belong in `Database::migrate()`.
+Schema v2 contains `problems`, `attempts`, `settings`, `schema_version`, normalized `tags` / `problem_tags`, and a small `learning_events` table for durable daily intake accounting. The v2 migration adds an indexed `study_order` to problems and preserves existing order, progress, history, and metadata. Future migrations belong in `Database::migrate()`.
 
 To experiment with a future scheduler, implement `IScheduler` and select it where the review controller constructs the scheduler. Per-problem state already stores scheduler identity/version and an extensible JSON metadata object. Advanced algorithms are intentionally not implemented.
 

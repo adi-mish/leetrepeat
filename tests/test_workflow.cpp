@@ -372,7 +372,11 @@ private slots:
         file.write("title,url,tags\nA,https://leetcode.com/problems/a,Arrays;Hashing\nB,https://leetcode.com/problems/b,Arrays\n a ,https://leetcode.com/problems/duplicate,Other\n"); file.close();
         QVERIFY(app.previewImport(QUrl::fromLocalFile(path))); QCOMPARE(app.importSummary()["ready"].toInt(),2);
         QCOMPARE(app.importSummary()["duplicates"].toInt(),1); QVERIFY(app.commitImport());
-        QCOMPARE(repo.problems().size(),2); QCOMPARE(repo.problems()[0].tags.size(),2);
+        QCOMPARE(repo.problems().size(),2);
+        QMap<QString,QStringList> importedTags;
+        for (const auto &p : repo.problems()) importedTags.insert(p.title,p.tags);
+        QCOMPARE(importedTags["A"],QStringList({"Arrays","Hashing"}));
+        QCOMPARE(importedTags["B"],QStringList({"Arrays"}));
         QCOMPARE(app.stats()["newCount"].toInt(),2); QVERIFY(!app.commitImport());
         auto exported=dir.filePath("export.csv"); QVERIFY(app.exportCsv(QUrl::fromLocalFile(exported)));
         QCOMPARE(CsvService::preview(exported,{}).ready.size(),2);
