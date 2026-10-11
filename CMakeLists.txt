@@ -12,6 +12,7 @@ add_library(leetrepeat_core
     src/scheduling/FixedIntervalScheduler.cpp
     src/services/DailyQueue.cpp
     src/services/CsvService.cpp
+    src/platform/RuntimeEnvironment.cpp
 )
 target_include_directories(leetrepeat_core PUBLIC src)
 target_link_libraries(leetrepeat_core PUBLIC Qt6::Core Qt6::Sql)
@@ -49,6 +50,11 @@ if(BUILD_TESTING)
         target_link_libraries(test_${test} PRIVATE leetrepeat_core Qt6::Test)
         add_test(NAME ${test} COMMAND test_${test})
     endforeach()
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        qt_add_executable(test_runtime tests/test_runtime.cpp)
+        target_link_libraries(test_runtime PRIVATE leetrepeat_core Qt6::Test)
+        add_test(NAME runtime COMMAND test_runtime)
+    endif()
     qt_add_executable(test_workflow tests/test_workflow.cpp)
     target_link_libraries(test_workflow PRIVATE leetrepeat_ui Qt6::Test)
     target_compile_definitions(test_workflow PRIVATE QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")

@@ -1,4 +1,5 @@
 #include "controllers/AppController.h"
+#include "platform/RuntimeEnvironment.h"
 #include <QCommandLineParser>
 #include <QDir>
 #include <QGuiApplication>
@@ -23,6 +24,7 @@ static int startupFailure(QGuiApplication &app, const QString &message, bool smo
 }
 
 int main(int argc,char **argv) {
+    const auto runtimeDirectory = lr::prepareWslgRuntime();
     QGuiApplication app(argc,argv);
     // This desktop UI does not scale or rotate text. Use native font rasterization
     // on Wayland instead of Qt Quick's distance-field glyph shader.

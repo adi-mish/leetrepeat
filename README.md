@@ -4,7 +4,7 @@ A local C++20 / Qt 6 desktop utility for memorizing a fixed corpus of problems. 
 
 ## Build on Ubuntu / WSL2
 
-Keep the repository in the Linux filesystem, for example `~/projects/leetrepeat`. WSLg supplies the display; there is no WSL-specific application code.
+Keep the repository in the Linux filesystem, for example `~/projects/leetrepeat`. WSLg supplies the display.
 
 On Ubuntu 22.04 or later:
 
@@ -12,7 +12,7 @@ On Ubuntu 22.04 or later:
 sudo apt update
 sudo apt install build-essential cmake ninja-build \
   qt6-base-dev qt6-declarative-dev qt6-base-dev-tools \
-  qt6-declarative-dev-tools libqt6sql6-sqlite qt6-qpa-plugins qt6-wayland \
+  qt6-declarative-dev-tools libqt6sql6-sqlite qt6-qpa-plugins qt6-wayland dmz-cursor-theme \
   qml6-module-qtquick qml6-module-qtquick-window \
   qml6-module-qtquick-controls qml6-module-qtquick-templates \
   qml6-module-qtquick-layouts qml6-module-qtquick-dialogs \
@@ -28,6 +28,10 @@ Requires Qt **6.2+**, CMake **3.21+**, and a C++20 compiler. Qt Quick Controls u
 If a QML module or plugin is reported missing, install the complete runtime list above. In particular, `qt6-declarative-dev` alone does not install the QML Controls, Templates, Dialogs, and WorkerScript plugins. Qt SQL also requires the separate SQLite driver package.
 
 Wayland remains supported and uses Qt's native font rasterizer for desktop text, configured before any QML views are created. Other platforms retain their default text renderer. LeetRepeat does not force an X11 fallback or change system-wide display settings. See [Qt's text rendering modes](https://doc.qt.io/qt-6/qquickwindow.html#setTextRenderType).
+
+On WSLg, if `XDG_RUNTIME_DIR` points at a missing or unusable directory (for example `/run/user/1000`), LeetRepeat creates a private temporary runtime directory for its own process and retains the existing Wayland socket connection. This happens before Qt starts; the temporary directory is removed on exit. Valid runtime directories are preserved.
+
+An invisible or very small Wayland cursor can also indicate a missing cursor theme. Install `dmz-cursor-theme` from the dependency list above; if your desktop still selects an unavailable theme, launch with `XCURSOR_THEME=DMZ-White ./build/leetrepeat`.
 
 ## Daily use
 
