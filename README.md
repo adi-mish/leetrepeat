@@ -33,6 +33,8 @@ On WSLg, if `XDG_RUNTIME_DIR` points at a missing or unusable directory (for exa
 
 An invisible or very small Wayland cursor can also indicate a missing cursor theme. Install `dmz-cursor-theme` from the dependency list above; if your desktop still selects an unavailable theme, launch with `XCURSOR_THEME=DMZ-White ./build/leetrepeat`.
 
+On WSL, problem links open Windows Chrome when `chrome.exe` is on `PATH` or installed under `C:\Program Files` or `C:\Program Files (x86)`. The app passes the URL directly to Chrome using its normal profile and windows; no Linux browser or extra WSL package is needed. Otherwise, links use Qt's normal system-browser handling, as they do on native Linux and Windows.
+
 ## Daily use
 
 1. Open **Problems**, then **Import CSV** or **Add problem**.

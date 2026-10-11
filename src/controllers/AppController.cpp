@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "scheduling/FixedIntervalScheduler.h"
+#include "platform/ExternalBrowser.h"
 #include <QDesktopServices>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -104,6 +105,6 @@ bool AppController::openDatabaseFolder() { return run([&]{
 }); }
 bool AppController::openProblemUrl(const QString &url) { return run([&]{
     QUrl target(url);
-    if ((target.scheme()!="https" && target.scheme()!="http") || !QDesktopServices::openUrl(target)) throw std::runtime_error("Could not open the problem URL.");
+    if (!openBrowserUrl(target)) throw std::runtime_error("Could not open the problem URL.");
 }); }
 }

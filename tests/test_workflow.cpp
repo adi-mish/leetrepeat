@@ -9,6 +9,7 @@
 #include <QProcess>
 #include <QScopeGuard>
 #include <QSqlError>
+#include <QSysInfo>
 #include <QtEndian>
 #include "controllers/AppController.h"
 #include "scheduling/FixedIntervalScheduler.h"
@@ -465,6 +466,42 @@ private slots:
             QVERIFY(second.waitForFinished(5000)); QCOMPARE(second.exitCode(),1);
             QVERIFY(second.readAllStandardError().contains("database is already in use"));
         }
+    }
+    void wslProblemLinksUseWindowsChrome() {
+#ifdef Q_OS_LINUX
+        if (!QSysInfo::kernelVersion().contains("microsoft",Qt::CaseInsensitive))
+            QSKIP("This test exercises the WSL browser bridge.");
+        QTemporaryDir dir; const auto folder=dir.filePath("Windows Chrome");
+        QVERIFY(QDir().mkpath(folder));
+        QFile chrome(folder+"/chrome.exe"); QVERIFY(chrome.open(QIODevice::WriteOnly));
+        chrome.write("#!/bin/sh\nprintf '%s\\n' \"$#\" \"$@\" > \"$LEETREPEAT_BROWSER_TEST_OUTPUT\"\n"); chrome.close();
+        QVERIFY(chrome.setPermissions(QFile::ReadOwner|QFile::WriteOwner|QFile::ExeOwner));
+        const auto oldPath=qgetenv("PATH"), oldOutput=qgetenv("LEETREPEAT_BROWSER_TEST_OUTPUT");
+        const auto restore=qScopeGuard([&]{
+            if (oldPath.isNull()) qunsetenv("PATH"); else qputenv("PATH",oldPath);
+            if (oldOutput.isNull()) qunsetenv("LEETREPEAT_BROWSER_TEST_OUTPUT");
+            else qputenv("LEETREPEAT_BROWSER_TEST_OUTPUT",oldOutput);
+        });
+        qputenv("PATH",QFile::encodeName(folder)+':'+oldPath);
+        const auto output=dir.filePath("received-url.txt");
+        qputenv("LEETREPEAT_BROWSER_TEST_OUTPUT",QFile::encodeName(output));
+        const auto received=[&]{ QFile file(output); return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray{}; };
+        Database db(dir.filePath("browser.sqlite")); Repository repo(db);
+        Problem p; p.title="Browser handoff";
+        p.url="https://leetcode.com/problems/concatenation-of-array/?a=one&b=%22two%20words%22#solution";
+        repo.add(p); AppController app(repo);
+        const auto expected=QByteArray("1\n")+QUrl(p.url).toEncoded()+'\n';
+        // Both detail and session actions must pass the entire URL as one argument,
+        // even with a spaced executable path and shell punctuation in the query.
+        QVERIFY(app.openProblemUrl(p.url)); QTRY_COMPARE(received(),expected);
+        QVERIFY(QFile::remove(output));
+        QVERIFY(app.review()->start()); QVERIFY(app.review()->openUrl()); QTRY_COMPARE(received(),expected);
+        QVERIFY(QFile::remove(output));
+        QVERIFY(!app.openProblemUrl("file:///tmp/should-not-open")); QVERIFY(app.messageIsError());
+        QVERIFY(!QFileInfo::exists(output));
+#else
+        QSKIP("This test exercises the WSL browser bridge.");
+#endif
     }
     void controllerFailuresAndRestart() {
         QTemporaryDir dir; auto path=dir.filePath("state.sqlite");

@@ -1,7 +1,7 @@
 #include "ReviewController.h"
 #include "services/DailyQueue.h"
 #include "scheduling/FixedIntervalScheduler.h"
-#include <QDesktopServices>
+#include "platform/ExternalBrowser.h"
 #include <QUrl>
 namespace lr {
 bool ReviewController::start() {
@@ -41,7 +41,7 @@ bool ReviewController::grade(bool passed) {
 }
 void ReviewController::end() { m_queue.clear(); m_active=false; m_revealed=false; emit changed(); }
 bool ReviewController::openUrl() {
-    if (m_active && QDesktopServices::openUrl(QUrl(m_current.url))) return true;
+    if (m_active && openBrowserUrl(QUrl(m_current.url))) return true;
     emit error("Could not open the problem URL in your browser."); return false;
 }
 }

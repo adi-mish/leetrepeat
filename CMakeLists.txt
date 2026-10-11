@@ -25,6 +25,7 @@ add_library(leetrepeat_ui
     src/models/ProblemListModel.cpp
     src/controllers/ReviewController.cpp
     src/controllers/AppController.cpp
+    src/platform/ExternalBrowser.cpp
 )
 target_link_libraries(leetrepeat_ui PUBLIC leetrepeat_core Qt6::Quick Qt6::QuickControls2)
 qt_add_executable(leetrepeat src/main.cpp)
